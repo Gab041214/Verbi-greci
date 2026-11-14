@@ -1,0 +1,13 @@
+{
+  "name": "verbi-greci",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PWA: coniugazioni dei verbi del greco moderno",
+  "scripts": {
+    "dev": "node serve.mjs",
+    "build": "node build.mjs",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=18" }
+}
