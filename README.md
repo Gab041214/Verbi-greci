@@ -12,15 +12,18 @@ npm test        # test del motore e dell'importatore
 npm run build   # genera dist/ (copia di src/ + service worker con elenco file e versione)
 ```
 
-## Pubblicazione: GitHub + Cloudflare Pages
+## Pubblicazione: GitHub + Cloudflare (Workers, risorse statiche)
 
-1. Crea un repository su GitHub e carica il contenuto di questa cartella.
-2. Cloudflare → *Workers & Pages* → *Create* → *Pages* → *Connect to Git* → scegli il repository.
-3. Impostazioni di build:
-   - **Build command:** `npm run build`
-   - **Build output directory:** `dist`
-   - Variabile d'ambiente (opzionale): `NODE_VERSION` = `20`
-4. Ogni push su `main` ripubblica il sito. Il service worker cambia versione a ogni build, quindi gli utenti ricevono l'aggiornamento.
+1. Carica il contenuto di questa cartella alla radice del repository GitHub.
+2. Cloudflare → *Workers e Pages* → *Crea applicazione* → *Continue with GitHub* → scegli il repository.
+3. Impostazioni:
+   - **Nome progetto:** `verbi-greci` (deve coincidere con `name` in `wrangler.jsonc`)
+   - **Comando di generazione:** `npm run build`
+   - **Comando Distribuisci:** `npx wrangler deploy` (legge `wrangler.jsonc`, che pubblica la cartella `dist`)
+   - **Token API:** meglio crearne uno nuovo dedicato a questo progetto
+4. Ogni push su `main` ripubblica il sito; il service worker cambia versione a ogni build.
+
+(Alternativa: flusso «Pages» legacy, con build `npm run build` e output `dist`, senza `wrangler.jsonc`.)
 
 ## Struttura
 
@@ -30,6 +33,7 @@ npm run build   # genera dist/ (copia di src/ + service worker con elenco file e
 - `src/js/store.js` – archivio personale in IndexedDB
 - `src/data/extra.json` – verbi extra versionati nel repository
 - `src/sw.js`, `src/manifest.webmanifest`, `src/_headers` – parte PWA e header Cloudflare
+- `wrangler.jsonc` – configurazione di pubblicazione su Cloudflare
 
 ## Dati: come si aggiungono e si correggono i verbi
 
@@ -46,4 +50,3 @@ Precedenza: dati personali > `extra.json` > lessico di base.
 
 - L'importatore interroga `en.wiktionary.org` direttamente dal browser (l'API consente CORS con `origin=*`) e legge la tabella nella sezione Greek. Se la struttura della pagina cambia, usa «Incolla la tabella» o l'inserimento manuale, e correggi dall'editor.
 - Le forme del lessico di base sono state scritte a mano e vanno verificate su un dizionario.
-
