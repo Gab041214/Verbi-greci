@@ -2,6 +2,7 @@ import {loadLexicon,finalizeEntry,parseDslLine,entryToDsl,buildIndex,conjugate,g
 import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
 import {fetchVerb,listVerbs,parsePastedText} from './wiktionary.js';
+import {fromHeadword} from './headword.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
@@ -163,6 +164,7 @@ function download(name,text){
 /* ---------- importazione da Wiktionary ---------- */
 function reportHtml(r){
   if(!r)return '';
+  if(r.noTable)return `<p class="warn">Wiktionary non ha la tabella di coniugazione per questo verbo. Le forme sono calcolate con le regole${r.notes&&r.notes.length?' ('+esc(r.notes.join('; '))+')':''}: controllale e correggile se serve.</p>`;
   const miss=(r.missing||[]);
   return miss.length?`<p class="warn">Dati non trovati nella tabella (verranno calcolati con le regole): ${esc(miss.join(', '))}</p>`:'<p class="ok">Tabella letta completamente.</p>';
 }
@@ -180,8 +182,13 @@ function showPreview(el,entry,report){
     await saveUser(entry,{});el.innerHTML='';toast('Salvato: '+entry.lemma);
   };
 }
-async function importOne(title,{silent}={}){
-  const {entry,report}=await fetchVerb(title);
+async function importOne(title){
+  let {entry,report}=await fetchVerb(title);
+  if(entry.fromHeadword){
+    const r=fromHeadword(entry);
+    entry=r.entry;
+    report={found:[],missing:[],noTable:true,notes:r.notes};
+  }
   return {entry,report};
 }
 $('wf').onsubmit=async ev=>{
@@ -212,7 +219,7 @@ $('bulk').onclick=async()=>{
         i++;$('bprog').value=i;
         if(BYID.has(keyOf(t))&&BYID.get(keyOf(t))._origin!=='base'){skipped++;continue;}
         if(BYID.has(keyOf(t))){skipped++;continue;}
-        try{const {entry}=await fetchVerb(t);await saveUser(entry,{});done++;}catch(_){fail++;}
+        try{const {entry}=await importOne(t);await saveUser(entry,{});done++;}catch(_){fail++;}
         $('blog').textContent=`Importati ${done} · saltati ${skipped} · errori ${fail} — ultimo: ${t}`;
         await new Promise(r=>setTimeout(r,150));
       }

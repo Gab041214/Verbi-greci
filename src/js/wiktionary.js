@@ -56,8 +56,8 @@ export function normLabel(x){
   if(/^αυτ(ός|ή|ό)(?![α-ωά-ώ])/.test(t))return '3 sg';
   if(/^αυτ(οί|ές|ά)(?![α-ωά-ώ])/.test(t))return '3 pl';
   t=t.replace(/(\d)\s*(st|nd|rd|th|ª|º|°)/,'$1').replace(/\bperson\b/g,'').replace(/\bsingular\b|\bsing\b\.?/g,'sg').replace(/\bplural\b/g,'pl').replace(/\./g,'').replace(/\s+/g,' ').trim();
-  const m=t.match(/^([123]) ?(sg|pl)\b/);
-  return m?m[1]+' '+m[2]:t;
+  const m=t.match(/^([123]) ?(sg|pl|s|p)$/)||t.match(/^([123]) ?(sg|pl)\b/);
+  return m?m[1]+' '+(m[2]==='s'?'sg':m[2]==='p'?'pl':m[2]):t;
 }
 const lab=r=>normLabel(r&&r[0]);
 const DEFAULT_COLS=[{voice:'act',dep:false},{voice:'act',dep:true},{voice:'pass',dep:false},{voice:'pass',dep:true}];
@@ -79,48 +79,72 @@ export function inferClass(title,O){
   return 'A';
 }
 
+const blank=r=>r.every(c=>!c);
+/* 6 righe di persona (1 sg … 3 pl), ignorando le righe vuote tra i due gruppi da 3 */
+function personBlock(rows,i){
+  const blk=[];let j=i;
+  while(blk.length<6&&j<rows.length){
+    if(blank(rows[j])){j++;continue;}
+    if(lab(rows[j])!==P6[blk.length])return null;
+    blk.push(rows[j]);j++;
+  }
+  return blk.length===6?{blk,end:j}:null;
+}
+/* colonne: l'intestazione "Active voice | Passive voice" usa colspan, quindi conta le celle dei dati */
+function columnsFor(header,ncol){
+  if(header&&colMap(header).length===ncol)return colMap(header);
+  return DEFAULT_COLS.slice(0,Math.min(ncol,4));
+}
+
 export function rowsToEntry(rows,title){
   const O={};const report={found:[],missing:[]};
   let header=null,bi=0,imp=0;
   for(let i=0;i<rows.length;i++){
     const r=rows[i];
     if(isHeader(r)){header=r;continue;}
-    if(lab(r)==='1 sg'&&P6.every((p,k)=>lab(rows[i+k])===p)){
-      const blk=rows.slice(i,i+6);i+=5;
-      if(blk.some(x=>x.slice(1).some(c=>/^θα\s/.test(c))))continue;
-      const cm=header?colMap(header):DEFAULT_COLS;
-      cm.forEach((c,k)=>{
-        const arr=blk.map(x=>cleanCell(x[k+1]));
-        const filled=arr.filter(Boolean).length;
-        if(filled===0)return;
-        let key;
-        if(bi===0)key=c.voice==='act'?(c.dep?'subj':'pres'):(c.dep?'psubj':'ppres');
-        else if(bi===1)key=c.voice==='act'?(c.dep?'aor':'impf'):(c.dep?'paor':'pimpf');
-        else return;
-        if(filled<6){report.missing.push(key+' (incompleto)');return;}
-        O[key]=arr;
-      });
-      bi++;continue;
-    }
-    if(lab(r)==='2 sg'&&lab(rows[i+1])==='2 pl'){
-      const a=r,b=rows[i+1];i+=1;
-      if(imp===0){
-        const cm=header?colMap(header):DEFAULT_COLS;
-        cm.forEach((c,k)=>{
-          const x=[cleanCell(a[k+1]),cleanCell(b[k+1])];
-          if(!x[0]||!x[1])return;
-          const key=c.voice==='act'?(c.dep?'iaor':'ipres'):(c.dep?'piaor':'pipres');
-          O[key]=x;
+    if(lab(r)==='1 sg'){
+      const pb=personBlock(rows,i);
+      if(pb){
+        i=pb.end-1;
+        const blk=pb.blk;
+        if(blk.some(x=>x.slice(1).some(c=>/^θα\s/.test(c))))continue;
+        const ncol=Math.max(...blk.map(x=>x.length-1));
+        columnsFor(header,ncol).forEach((c,k)=>{
+          const arr=blk.map(x=>cleanCell(x[k+1]));
+          const filled=arr.filter(Boolean).length;
+          if(filled===0)return;
+          let key;
+          if(bi===0)key=c.voice==='act'?(c.dep?'subj':'pres'):(c.dep?'psubj':'ppres');
+          else if(bi===1)key=c.voice==='act'?(c.dep?'aor':'impf'):(c.dep?'paor':'pimpf');
+          else return;
+          if(filled<6){report.missing.push(key+' (incompleto)');return;}
+          O[key]=arr;
         });
+        bi++;continue;
       }
-      imp++;continue;
+    }
+    if(lab(r)==='2 sg'){
+      let j=i+1;while(j<rows.length&&blank(rows[j]))j++;
+      if(rows[j]&&lab(rows[j])==='2 pl'){
+        const a=r,b=rows[j];i=j;
+        if(imp===0){
+          const ncol=Math.max(a.length,b.length)-1;
+          columnsFor(header,ncol).forEach((c,k)=>{
+            const x=[cleanCell(a[k+1]),cleanCell(b[k+1])];
+            if(!x[0]||!x[1])return;
+            const key=c.voice==='act'?(c.dep?'iaor':'ipres'):(c.dep?'piaor':'pipres');
+            O[key]=x;
+          });
+        }
+        imp++;continue;
+      }
     }
     const l=lab(r);
     if(/gerund|active participle|present participle/.test(l)){
       const v=r.slice(1).map(cleanCell).find(Boolean);if(v&&!O.ptc)O.ptc=[v.split(' / ')[0]];
     }
     if(/(passive|perfect|past) participle/.test(l)){
-      const v=r.slice(1).map(cleanCell).find(Boolean);if(v&&!O.__m)O.__m=v;
+      const v=r.slice(1).map(cleanCell).find(Boolean);if(v&&!O.__m)O.__m=v.split(' / ')[0];
     }
   }
   const m=O.__m;delete O.__m;
@@ -164,9 +188,26 @@ export function parseGreekVerbHtml(html,title){
   try{return parseGreekVerbHtml0(html,title);}
   catch(e){e.diag=diagnose(html,title);throw e;}
 }
+/* riga del lemma: "(simple past προσανατόλισα, passive …, ppp προσανατολισμένος)" */
+export function headwordInfo(sec){
+  const i=sec.indexOf('headword-line');
+  if(i<0)return null;
+  const t=htmlText(sec.slice(i,i+1500));
+  const g=re=>{const m=t.match(re);return m?m[1]:'';};
+  const past=g(/(?:simple past|past)\s+([α-ωά-ώ]+)/),ppp=g(/ppp\s+([α-ωά-ώ]+)/),passive=g(/passive\s+([α-ωά-ώ]+)/);
+  return past||ppp?{past,ppp,passive}:null;
+}
 function parseGreekVerbHtml0(html,title){
   const sec=greekSection(html);
   if(!sec)throw new Error('Nessuna sezione «Greek» nella pagina di '+title);
+  if(!/<table/i.test(sec)){
+    const h=headwordInfo(sec);
+    if(h){
+      const entry={forms:[title],cls:null,gloss:'',O:{},source:'wiktionary',updated:new Date().toISOString().slice(0,10),fromHeadword:h};
+      const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
+      return {entry,report:{found:[],missing:['tabella assente su Wiktionary'],noTable:true}};
+    }
+  }
   const {entry,report}=rowsToEntry(htmlToRows(sec),title);
   const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
   if(!entry.O.pres&&!entry.O.ppres)throw new Error('Tabella di coniugazione non trovata per '+title+' (non è un verbo del greco moderno?)');
