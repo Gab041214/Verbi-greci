@@ -46,3 +46,4 @@ Precedenza: dati personali > `extra.json` > lessico di base.
 
 - L'importatore interroga `en.wiktionary.org` direttamente dal browser (l'API consente CORS con `origin=*`) e legge la tabella nella sezione Greek. Se la struttura della pagina cambia, usa «Incolla la tabella» o l'inserimento manuale, e correggi dall'editor.
 - Le forme del lessico di base sono state scritte a mano e vanno verificate su un dizionario.
+
