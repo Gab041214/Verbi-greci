@@ -166,6 +166,11 @@ function reportHtml(r){
   const miss=(r.missing||[]);
   return miss.length?`<p class="warn">Dati non trovati nella tabella (verranno calcolati con le regole): ${esc(miss.join(', '))}</p>`:'<p class="ok">Tabella letta completamente.</p>';
 }
+function failBox(el,err,intro){
+  const d=err.diag?`<details class="box"><summary>Dettagli tecnici (da inviare a Claude)</summary><textarea id="diag" rows="8" class="full" readonly>${esc(err.diag)}</textarea><button type="button" class="btn" id="diagcopy">Copia</button></details>`:'';
+  el.innerHTML=`<p class="warn">${esc(intro)}: ${esc(err.message)}.</p>${d}`;
+  const b=$('diagcopy');if(b)b.onclick=async()=>{try{await navigator.clipboard.writeText(err.diag);toast('Copiato');}catch(_){$('diag').select();toast('Seleziona e copia');}};
+}
 function showPreview(el,entry,report){
   entry._origin='preview';
   el.innerHTML=reportHtml(report)+'<div id="pv-card"></div><div class="row wrapbtn"><button type="button" class="btn pri" id="pv-s">Salva nell\'archivio</button><button type="button" class="btn" id="pv-x">Scarta</button></div>';
@@ -184,13 +189,13 @@ $('wf').onsubmit=async ev=>{
   const t=$('wq').value.trim();if(!t)return;
   $('prev').innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
   try{const {entry,report}=await importOne(t);showPreview($('prev'),entry,report);}
-  catch(err){$('prev').innerHTML=`<p class="warn">Importazione non riuscita: ${esc(err.message)}. Puoi provare con «Incolla la tabella» oppure inserire il verbo a mano.</p>`;}
+  catch(err){failBox($('prev'),err,'Importazione non riuscita');}
 };
 $('pgo').onclick=()=>{
   const t=$('pt').value.trim(),p=$('pp').value;
   if(!t||!p.trim()){toast('Serve il verbo e la tabella incollata');return;}
   try{const {entry,report}=parsePastedText(p,t);showPreview($('prev'),entry,report);$('prev').scrollIntoView({block:'start'});}
-  catch(err){$('prev').innerHTML=`<p class="warn">${esc(err.message)}</p>`;}
+  catch(err){failBox($('prev'),err,'Tabella non letta');}
 };
 let stopBulk=false,bulkCont=null;
 $('bulk').onclick=async()=>{
