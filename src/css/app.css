@@ -113,3 +113,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--j-ring);border-c
 @media(prefers-color-scheme:dark){.btn.pri,#f button{color:var(--ink)}}
 #toast{background:var(--j-fill-strong);color:var(--ink);border:0.33px solid var(--j-ring);-webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);box-shadow:var(--n-drop)}
 #sugg:empty{display:none}
+
+.exs{margin:12px 0 4px}
+.exs summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 6px;font-weight:600;color:var(--ink)}
+.exs summary::-webkit-details-marker{display:none}
+.exs summary::after{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .2s}
+.exs[open] summary::after{transform:rotate(-135deg) translate(-2px,0)}
