@@ -97,6 +97,7 @@ function search(q){
   $('sugg').innerHTML='';
   const hit=INDEX.get(k);
   if(hit){show(hit.e,hit.voice);return;}
+  $('wq').value=q.trim();   // verbo non nel database: precompila il campo di importazione
   const g=guessEntry(q);
   if(g){g._origin='guess';show(g,'act');return;}
   $('out').innerHTML=`<p class="msg">Verbo non trovato. Scrivi la 1ª persona singolare del presente indicativo, ad esempio <b lang="el">γράφω</b>, <b lang="el">αγαπώ</b> o <b lang="el">έρχομαι</b>.</p>`;
@@ -179,7 +180,7 @@ function showPreview(el,entry,report){
   renderEntry($('pv-card'),entry,'act');
   $('pv-x').onclick=()=>{el.innerHTML='';};
   $('pv-s').onclick=async()=>{
-    await saveUser(entry,{});el.innerHTML='';toast('Salvato: '+entry.lemma);
+    await saveUser(entry,{});el.innerHTML='';$('wq').value='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);
   };
 }
 async function importOne(title){
