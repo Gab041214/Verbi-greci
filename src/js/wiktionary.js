@@ -48,7 +48,18 @@ export function cleanCell(s){
     .filter(t=>GREEK_FORM.test(t));
   return [...new Set(toks)].join(' / ');
 }
-const lab=r=>(r&&r[0]||'').replace(/\s+/g,' ').trim().toLowerCase();
+const PRON={'εγώ':'1 sg','εσύ':'2 sg','εμείς':'1 pl','εσείς':'2 pl'};
+/* normalizza l'etichetta di riga: "1st person singular" / "1st sg." / "εγώ" -> "1 sg" */
+export function normLabel(x){
+  let t=(x||'').replace(/\s+/g,' ').trim().toLowerCase();
+  if(PRON[t])return PRON[t];
+  if(/^αυτ(ός|ή|ό)(?![α-ωά-ώ])/.test(t))return '3 sg';
+  if(/^αυτ(οί|ές|ά)(?![α-ωά-ώ])/.test(t))return '3 pl';
+  t=t.replace(/(\d)\s*(st|nd|rd|th|ª|º|°)/,'$1').replace(/\bperson\b/g,'').replace(/\bsingular\b|\bsing\b\.?/g,'sg').replace(/\bplural\b/g,'pl').replace(/\./g,'').replace(/\s+/g,' ').trim();
+  const m=t.match(/^([123]) ?(sg|pl)\b/);
+  return m?m[1]+' '+m[2]:t;
+}
+const lab=r=>normLabel(r&&r[0]);
 const DEFAULT_COLS=[{voice:'act',dep:false},{voice:'act',dep:true},{voice:'pass',dep:false},{voice:'pass',dep:true}];
 const colMap=h=>h.slice(1).map(c=>({voice:/passive/i.test(c)?'pass':'act',dep:/dependent/i.test(c)}));
 const isHeader=r=>r.slice(1).some(c=>/voice/i.test(c));
@@ -134,7 +145,26 @@ export function firstGloss(sectionHtml){
   const t=htmlText(m[1]);
   return t.length>140?t.slice(0,137)+'…':t;
 }
+/* testo diagnostico da inviare allo sviluppatore quando la tabella non viene riconosciuta */
+export function diagnose(html,title,isText){
+  const out=['verbo: '+title];
+  if(isText){const rows=textToRows(html);out.push('righe: '+rows.length);rows.slice(0,70).forEach(r=>out.push(r.join(' | ').slice(0,200)));return out.join('\n');}
+  const sec=greekSection(html);
+  out.push('lunghezza pagina: '+html.length+' · sezione Greek: '+(sec?sec.length:'NON TROVATA'));
+  out.push('titoli h2: '+[...html.matchAll(/<h2[^>]*id="([^"]*)"/g)].map(m=>m[1]).join(', '));
+  const base=sec||html;
+  const tabs=[...base.matchAll(/<table[^>]*>/gi)].map(m=>(m[0].match(/class="([^"]*)"/)||[,''])[1]);
+  out.push('tabelle ('+tabs.length+'): '+tabs.join(' ; '));
+  const rows=htmlToRows(base);
+  out.push('righe: '+rows.length);
+  rows.slice(0,70).forEach(r=>out.push(r.join(' | ').slice(0,200)));
+  return out.join('\n');
+}
 export function parseGreekVerbHtml(html,title){
+  try{return parseGreekVerbHtml0(html,title);}
+  catch(e){e.diag=diagnose(html,title);throw e;}
+}
+function parseGreekVerbHtml0(html,title){
   const sec=greekSection(html);
   if(!sec)throw new Error('Nessuna sezione «Greek» nella pagina di '+title);
   const {entry,report}=rowsToEntry(htmlToRows(sec),title);
@@ -143,6 +173,10 @@ export function parseGreekVerbHtml(html,title){
   return {entry,report};
 }
 export function parsePastedText(text,title){
+  try{return parsePasted0(text,title);}
+  catch(e){e.diag=diagnose(text,title,!/<table/i.test(text));throw e;}
+}
+function parsePasted0(text,title){
   const rows=/<table/i.test(text)?htmlToRows(text):textToRows(text);
   const {entry,report}=rowsToEntry(rows,title);
   if(!entry.O.pres&&!entry.O.ppres)throw new Error('Nel testo incollato non trovo la tabella di coniugazione.');
