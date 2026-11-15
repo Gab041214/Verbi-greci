@@ -119,3 +119,17 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--j-ring);border-c
 .exs summary::-webkit-details-marker{display:none}
 .exs summary::after{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translateY(-2px);transition:transform .2s}
 .exs[open] summary::after{transform:rotate(-135deg) translate(-2px,0)}
+
+/* ===== Gomma per svuotare i campi ===== */
+.fw{position:relative;display:flex;flex:1 1 auto;min-width:0;width:100%}
+.fw>input,.fw>textarea{padding-right:46px}
+.fw>button.clr,#f .fw>button.clr{
+  position:absolute!important;right:8px;top:50%;transform:translateY(-50%);
+  width:32px!important;height:32px!important;min-height:0!important;padding:0!important;margin:0!important;
+  display:none!important;align-items:center;justify-content:center;
+  background:transparent!important;border:0!important;box-shadow:none!important;border-radius:50%!important;
+  color:var(--j-off)!important;cursor:pointer;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;z-index:2}
+.fw.has>button.clr,#f .fw.has>button.clr{display:inline-flex!important}
+.fw>button.clr::before,#f .fw>button.clr::before{content:none!important}
+.fw>textarea~button.clr{top:22px}
+.fw>button.clr:active{color:var(--ink)!important}
