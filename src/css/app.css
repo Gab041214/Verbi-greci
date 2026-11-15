@@ -133,3 +133,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--j-ring);border-c
 .fw>button.clr::before,#f .fw>button.clr::before{content:none!important}
 .fw>textarea~button.clr{top:22px}
 .fw>button.clr:active{color:var(--ink)!important}
+/* campo di ricerca: stessa forma a capsula degli altri campi */
+#f input{border-radius:999px}
+#f input{font-size:1rem;padding:0 18px;padding-right:46px}
+.btn.pri{border-color:var(--j-ring);border-left-color:var(--j-ring-x);border-right-color:var(--j-ring-x)}
