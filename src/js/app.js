@@ -77,23 +77,23 @@ function renderEntry(el,e,voiceId,opts={}){
 /* ---------- ricerca ---------- */
 function show(e,voice){
   current=e;
-  const own=e._origin==='user';
   const actions=`<button type="button" class="btn" data-a="edit">Correggi forme</button>`+
-    (e.guessed?`<button type="button" class="btn pri" data-a="save">Salva nell'archivio</button>`:'')+
-    (own?`<button type="button" class="btn danger" data-a="del">Elimina dal mio archivio</button>`:'');
+    (e.guessed?'':`<button type="button" class="btn" data-a="gloss">Correggi traduzione</button>`)+
+    (e.guessed?`<button type="button" class="btn pri" data-a="save">Salva nell'archivio</button>`:'');
   renderEntry($('out'),e,voice,{actions,onVoice:v=>{show.voice=v;}});
   $('out').onclick=ev=>{
     const a=ev.target.dataset&&ev.target.dataset.a;if(!a)return;
     if(a==='edit')openEditor(e,show.voice||voice);
+    if(a==='gloss')openGloss(e);
     if(a==='save')saveUser(e,{source:'manual'}).then(()=>{toast('Salvato');search(e.lemma);});
-    if(a==='del')delUser(e);
   };
   show.voice=voice;
 }
 async function delUser(e){
-  if(!confirm('Eliminare «'+e.lemma+'» dal tuo archivio? Se esiste nel lessico di base tornerà la versione originale.'))return;
+  if(!confirm('Eliminare «'+e.lemma+'» dal tuo archivio? Se esiste nel lessico di base tornerà la versione originale.'))return false;
   await store.del(keyOf(e.forms[0]));USER=(await store.getAll()).map(hydrate);rebuild();
-  $('out').innerHTML='';toast('Eliminato');
+  if(current&&keyOf(current.forms[0])===keyOf(e.forms[0]))$('out').innerHTML='';
+  renderArchive();toast('Eliminato');return true;
 }
 function search(q){
   const k=keyOf(q);if(!k){$('out').innerHTML='';return;}
@@ -127,7 +127,7 @@ function openEditor(e,voiceId){
     h+=`<fieldset><legend>${name}</legend>`+raw.map((x,i)=>`<label><span lang="el">${labels(n)[i]}</span><input lang="el" data-f="${f}" data-i="${i}" data-o="${esc(x)}" value="${esc(x)}" spellcheck="false"></label>`).join('')+`</fieldset>`;
   }
   if(v.raw.ptc!==undefined)h+=`<fieldset><legend>Gerundio / participio</legend><label><span>Gerundio</span><input lang="el" data-f="ptc" data-i="0" data-o="${esc(v.raw.ptc)}" value="${esc(v.raw.ptc)}"></label>${typeof v.raw.m==='string'?`<label><span>Part. passato</span><input lang="el" data-f="m" data-i="0" data-o="${esc(v.raw.m)}" value="${esc(v.raw.m)}"></label>`:''}</fieldset>`;
-  h+=`</div><label class="mute" style="display:block;margin-top:10px">Significato (in italiano)<input id="ed-g" value="${esc(e.gloss)}"></label>
+  h+=`</div>
   <div class="row wrapbtn"><button type="button" class="btn pri" id="ed-s">Salva correzioni</button><button type="button" class="btn" id="ed-x">Annulla</button></div></div>`;
   $('out').insertAdjacentHTML('afterbegin',h);
   $('ed').scrollIntoView({block:'nearest'});
@@ -145,7 +145,6 @@ function openEditor(e,voiceId){
       if(!key)continue;
       ne.O[key]=arr.map(([n,o])=>(n||o).replace(/\s*\/\s*/g,' / '));
     }
-    ne.gloss=$('ed-g').value.trim();
     delete ne.guessed;
     if(!ne.source||ne.source==='base'||ne.source==='extra')ne.source=e.source||'manual';
     const saved=await saveUser(ne,{edited:true});
@@ -154,12 +153,59 @@ function openEditor(e,voiceId){
   };
 }
 
+/* ---------- pop-up: correggi traduzione ---------- */
+function openGloss(e){
+  closeGloss();
+  const d=document.createElement('div');d.className='ovl';d.id='gl';
+  d.innerHTML=`<div class="pop" role="dialog" aria-modal="true" aria-labelledby="gl-t"><h3 id="gl-t">Traduzione di <span lang="el">${esc(e.lemma)}</span></h3>${glossIsEn(e)?'<p class="mute">Il significato è ancora in inglese: scrivilo in italiano.</p>':''}<input id="gl-i" value="${esc(e.gloss)}" placeholder="es. votare" autocomplete="off"><div class="row wrapbtn"><button type="button" class="btn pri" id="gl-s">Salva</button><button type="button" class="btn" id="gl-x">Chiudi</button></div></div>`;
+  document.body.appendChild(d);
+  d.onclick=ev=>{if(ev.target===d)closeGloss();};
+  $('gl-x').onclick=closeGloss;
+  $('gl-s').onclick=async()=>{
+    const g=$('gl-i').value.trim();
+    const ne=hydrate({...e,O:e.O});ne.O=JSON.parse(JSON.stringify(e.O||{}));ne.gloss=g;
+    if(!ne.source||ne.source==='base'||ne.source==='extra')ne.source=e.source||'manual';
+    const saved=await saveUser(ne,{edited:true});
+    closeGloss();toast('Traduzione salvata');
+    show(BYID.get(keyOf(saved.forms[0])),show.voice);
+  };
+  setTimeout(()=>{const i=$('gl-i');i&&i.focus();i&&i.select();},30);
+}
+function closeGloss(){const d=$('gl');if(d)d.remove();}
+
 /* ---------- archivio ---------- */
 function renderArchive(){
   const k=keyOf($('afilter').value||'');
   const rows=LIST.filter(e=>!k||e.keys.some(f=>keyOf(f).includes(k))||keyOf(e.gloss).includes(k));
-  $('alist').innerHTML=rows.slice(0,300).map(e=>`<div class="item" data-l="${esc(e.lemma)}"><span><b lang="el">${esc(e.display)}</b><em>${esc(e.gloss)}</em>${glossIsEn(e)?EN_TAG:''}</span><span class="badge ${e._origin==='user'?'user':''}">${esc(e._origin==='user'?(e.edited?'corretto':SRC[e.source]||'mio'):SRC[e._origin])}</span></div>`).join('')+(rows.length>300?`<p class="mute">Mostrati i primi 300 di ${rows.length}: affina il filtro.</p>`:'');
-  $('alist').querySelectorAll('.item').forEach(it=>it.onclick=()=>{go('cerca');$('q').value=it.dataset.l;search(it.dataset.l);window.scrollTo(0,0);});
+  const shown=rows.slice(0,300);
+  $('alist').innerHTML=shown.map((e,i)=>`<div class="sw" data-i="${i}">${e._origin==='user'?'<button type="button" class="sw-del">Elimina</button>':''}<div class="item" data-l="${esc(e.lemma)}"><span><b lang="el">${esc(e.display)}</b><em>${esc(e.gloss)}</em>${glossIsEn(e)?EN_TAG:''}</span><span class="badge ${e._origin==='user'?'user':''}">${esc(e._origin==='user'?(e.edited?'corretto':SRC[e.source]||'mio'):SRC[e._origin])}</span></div></div>`).join('')+(rows.length>300?`<p class="mute">Mostrati i primi 300 di ${rows.length}: affina il filtro.</p>`:'');
+  const W=96;
+  const closeAll=except=>$('alist').querySelectorAll('.sw.open').forEach(x=>{if(x!==except){x.classList.remove('open','drag');const t=x.querySelector('.item');t.style.transition='transform .22s ease';t.style.transform='';}});
+  $('alist').querySelectorAll('.sw').forEach(sw=>{
+    const e=shown[+sw.dataset.i],it=sw.querySelector('.item'),del=sw.querySelector('.sw-del');
+    let x0=0,y0=0,dx=0,on=false,moved=false,lock=null,base=0;
+    const set=(v,anim)=>{it.style.transition=anim?'transform .22s ease':'none';it.style.transform=v?`translateX(${v}px)`:'';};
+    if(del){
+      it.addEventListener('pointerdown',ev=>{if(ev.pointerType==='mouse'&&ev.button!==0)return;on=true;moved=false;lock=null;x0=ev.clientX;y0=ev.clientY;dx=0;base=sw.classList.contains('open')?-W:0;closeAll(sw);});
+      it.addEventListener('pointermove',ev=>{
+        if(!on)return;const mx=ev.clientX-x0,my=ev.clientY-y0;
+        if(!lock){if(Math.abs(mx)<6&&Math.abs(my)<6)return;lock=Math.abs(mx)>Math.abs(my)?'h':'v';if(lock==='h'){try{it.setPointerCapture(ev.pointerId);}catch(_){}}}
+        if(lock!=='h')return;
+        moved=true;dx=Math.max(-W-20,Math.min(0,base+mx));sw.classList.add('drag');set(dx,false);
+      });
+      const end=()=>{
+        if(!on)return;on=false;
+        if(lock==='h'){const open=dx<-W/2;sw.classList.toggle('open',open);sw.classList.toggle('drag',open);set(open?-W:0,true);}
+      };
+      it.addEventListener('pointerup',end);it.addEventListener('pointercancel',end);
+      del.onclick=async()=>{const ok=await delUser(e);if(!ok){sw.classList.remove('open','drag');set(0,true);}};
+    }
+    it.onclick=()=>{
+      if(moved){moved=false;return;}
+      if(sw.classList.contains('open')){sw.classList.remove('open','drag');set(0,true);return;}
+      go('cerca');$('q').value=it.dataset.l;search(it.dataset.l);window.scrollTo(0,0);
+    };
+  });
 }
 function download(name,text){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
