@@ -94,3 +94,15 @@ test('tabella reale di προσαρμόζω (righe diagnostiche)',()=>{
   const e=finalizeEntry({...entry,O:JSON.parse(JSON.stringify(O))});
   assert.ok(conjugate(e).find(v=>v.id==='pass'));
 });
+
+test('varianti separate da " - " (παρακολουθώ, classe B2 con forme colloquiali)',()=>{
+  const lines=readFileSync(new URL('./fixtures/parakolutho.diag.txt',import.meta.url),'utf8').split('\n').slice(5);
+  const rows=lines.map(l=>l.split(' | ').map(c=>c.trim()));
+  const {entry,report}=rowsToEntry(rows,'παρακολουθώ');
+  assert.equal(entry.cls,'B2');
+  assert.deepEqual(report.missing,[]);
+  assert.equal(entry.O.pres[0],'παρακολουθώ / παρακολουθάω');
+  assert.equal(entry.O.ppres[0],'παρακολουθούμαι / παρακολουθιέμαι');
+  assert.equal(entry.O.impf[0],'παρακολουθούσα / παρακολούθαγα');
+  assert.equal(entry.m,'παρακολουθημένος');
+});
