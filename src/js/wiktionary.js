@@ -44,6 +44,7 @@ export function textToRows(text){
 export function cleanCell(s){
   if(!s)return '';
   s=s.replace(/\[[^\]]*\]/g,'').replace(/➤/g,'').replace(/[—–]/g,'');
+  s=s.replace(/\s+-\s*|\s*-\s+/g,', ');   // «forma - variante colloquiale»
   const toks=s.split(/\s*[,;\/]\s*/).map(t=>t.trim()).filter(Boolean)
     .filter(t=>GREEK_FORM.test(t));
   return [...new Set(toks)].join(' / ');
