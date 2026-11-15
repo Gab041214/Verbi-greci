@@ -10,6 +10,8 @@ const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"
 const PERS=['εγώ','εσύ','αυτός/-ή/-ό','εμείς','εσείς','αυτοί/-ές/-ά'];
 const GROUPS=[['ind','Indicativo','Οριστική'],['sub','Congiuntivo (με «να»)','Υποτακτική'],['imp','Imperativo','Προστακτική'],['nom','Forme nominali','Άκλιτοι τύποι']];
 const cell=f=>String(f).split(' / ').map(x=>'<span lang="el">'+esc(x)+'</span>').join('<br>');
+const glossIsEn=e=>!!e.gloss_en&&e.gloss===e.gloss_en;
+const EN_TAG=' <span class="tag warn" title="Significato in inglese: correggilo in italiano">EN</span>';
 const SRC={base:'Lessico',extra:'Repository',wiktionary:'Wiktionary',manual:'Manuale',user:'Mio'};
 
 let BASE=[],EXTRA=[],USER=[],LIST=[],INDEX=new Map(),BYID=new Map();
@@ -57,7 +59,7 @@ function renderEntry(el,e,voiceId,opts={}){
   if(!vs||!vs.length){el.innerHTML='<p class="msg bad">Non riesco a coniugare questo verbo con i dati attuali.</p>';return;}
   const v=vs.find(x=>x.id===voiceId)||vs[0];
   let h=`<section class="hero"><div class="lemma" lang="el">${esc(e.display)}</div>`;
-  if(e.gloss)h+=`<div class="gloss">${esc(e.gloss)}</div>`;
+  if(e.gloss)h+=`<div class="gloss">${esc(e.gloss)}${glossIsEn(e)?EN_TAG:''}</div>`;
   h+=`<div class="tags"><span class="tag">${esc(CLASS_DESC[e.cls]||e.cls)}</span>`;
   const o=e._origin||e.source;
   if(o&&!e.guessed)h+=`<span class="tag">${esc(SRC[e.edited?'user':(e.source==='wiktionary'?'wiktionary':o)]||o)}${e.edited?' · corretto':''}</span>`;
@@ -125,7 +127,7 @@ function openEditor(e,voiceId){
     h+=`<fieldset><legend>${name}</legend>`+raw.map((x,i)=>`<label><span lang="el">${labels(n)[i]}</span><input lang="el" data-f="${f}" data-i="${i}" data-o="${esc(x)}" value="${esc(x)}" spellcheck="false"></label>`).join('')+`</fieldset>`;
   }
   if(v.raw.ptc!==undefined)h+=`<fieldset><legend>Gerundio / participio</legend><label><span>Gerundio</span><input lang="el" data-f="ptc" data-i="0" data-o="${esc(v.raw.ptc)}" value="${esc(v.raw.ptc)}"></label>${typeof v.raw.m==='string'?`<label><span>Part. passato</span><input lang="el" data-f="m" data-i="0" data-o="${esc(v.raw.m)}" value="${esc(v.raw.m)}"></label>`:''}</fieldset>`;
-  h+=`</div><label class="mute" style="display:block;margin-top:10px">Significato<input id="ed-g" value="${esc(e.gloss)}"></label>
+  h+=`</div><label class="mute" style="display:block;margin-top:10px">Significato (in italiano)<input id="ed-g" value="${esc(e.gloss)}"></label>
   <div class="row wrapbtn"><button type="button" class="btn pri" id="ed-s">Salva correzioni</button><button type="button" class="btn" id="ed-x">Annulla</button></div></div>`;
   $('out').insertAdjacentHTML('afterbegin',h);
   $('ed').scrollIntoView({block:'nearest'});
@@ -156,7 +158,7 @@ function openEditor(e,voiceId){
 function renderArchive(){
   const k=keyOf($('afilter').value||'');
   const rows=LIST.filter(e=>!k||e.keys.some(f=>keyOf(f).includes(k))||keyOf(e.gloss).includes(k));
-  $('alist').innerHTML=rows.slice(0,300).map(e=>`<div class="item" data-l="${esc(e.lemma)}"><span><b lang="el">${esc(e.display)}</b><em>${esc(e.gloss)}</em></span><span class="badge ${e._origin==='user'?'user':''}">${esc(e._origin==='user'?(e.edited?'corretto':SRC[e.source]||'mio'):SRC[e._origin])}</span></div>`).join('')+(rows.length>300?`<p class="mute">Mostrati i primi 300 di ${rows.length}: affina il filtro.</p>`:'');
+  $('alist').innerHTML=rows.slice(0,300).map(e=>`<div class="item" data-l="${esc(e.lemma)}"><span><b lang="el">${esc(e.display)}</b><em>${esc(e.gloss)}</em>${glossIsEn(e)?EN_TAG:''}</span><span class="badge ${e._origin==='user'?'user':''}">${esc(e._origin==='user'?(e.edited?'corretto':SRC[e.source]||'mio'):SRC[e._origin])}</span></div>`).join('')+(rows.length>300?`<p class="mute">Mostrati i primi 300 di ${rows.length}: affina il filtro.</p>`:'');
   $('alist').querySelectorAll('.item').forEach(it=>it.onclick=()=>{go('cerca');$('q').value=it.dataset.l;search(it.dataset.l);window.scrollTo(0,0);});
 }
 function download(name,text){
@@ -177,10 +179,13 @@ function failBox(el,err,intro){
 }
 function showPreview(el,entry,report){
   entry._origin='preview';
-  el.innerHTML=reportHtml(report)+'<div id="pv-card"></div><div class="row wrapbtn"><button type="button" class="btn pri" id="pv-s">Salva nell\'archivio</button><button type="button" class="btn" id="pv-x">Scarta</button></div>';
+  const gl=esc(entry.gloss||'');
+  el.innerHTML=reportHtml(report)+'<div id="pv-card"></div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(da Wiktionary, in inglese: sostituiscilo con la traduzione)</em>':'')+'<input id="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri" id="pv-s">Salva nell\'archivio</button><button type="button" class="btn" id="pv-x">Scarta</button></div>';
   renderEntry($('pv-card'),entry,'act');
   $('pv-x').onclick=()=>{el.innerHTML='';};
   $('pv-s').onclick=async()=>{
+    const g=$('pv-g').value.trim();
+    if(g)entry.gloss=g;
     await saveUser(entry,{});el.innerHTML='';$('wq').value='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);
   };
 }
