@@ -137,3 +137,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--j-ring);border-c
 #f input{border-radius:999px}
 #f input{font-size:1rem;padding:0 18px;padding-right:46px}
 .btn.pri{border-color:var(--j-ring);border-left-color:var(--j-ring-x);border-right-color:var(--j-ring-x)}
+
+.pvg{display:block;margin:12px 0 4px;font-size:.88rem;color:var(--mute)}
+.pvg em{font-style:normal}
+.pvg .fw{margin-top:4px}
+.gloss .tag,.item em+.tag{margin-left:8px;vertical-align:middle;font-size:.72rem;padding:2px 8px}
