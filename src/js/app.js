@@ -3,6 +3,7 @@ import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
 import {fetchVerb,listVerbs,parsePastedText} from './wiktionary.js';
 import {fromHeadword} from './headword.js';
+import {initClearable} from './clearable.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
@@ -290,6 +291,7 @@ $('q').addEventListener('input',()=>suggest($('q').value));
 $('chips').innerHTML=['γράφω','αγαπώ','κάνω','πηγαίνω','έρχομαι','λέω','είμαι','κοιμάμαι'].map(x=>`<button type="button" lang="el">${x}</button>`).join('');
 $('chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('q').value=b.textContent;search(b.textContent);});
 
+initClearable();
 loadAll().then(()=>{window.__ready=true;});
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
