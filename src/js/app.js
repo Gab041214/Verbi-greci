@@ -25,7 +25,7 @@ function rebuild(){
     for(const e of arr){e._origin=origin;m.set(keyOf(e.forms[0]),e);}
   }
   LIST=[...m.values()].sort((a,b)=>keyOf(a.lemma).localeCompare(keyOf(b.lemma),'el'));
-  BYID=m;INDEX=buildIndex(LIST);
+  BYID=m;INDEX=buildIndex(LIST);if(typeof renderChips==='function'&&$('chips'))renderChips();
   $('count').textContent=LIST.length+' verbi in archivio.';
   $('acount').textContent=LIST.length+' verbi';
 }
@@ -313,6 +313,43 @@ function manualEntry(){
   if($('m-p').value.trim())e.p=$('m-p').value.trim();
   return finalizeEntry(e);
 }
+/* ---------- forma avanzata (pop-up che compila la stringa DSL) ---------- */
+const ADV_O=['pres','impf','aor','subj','ipres','iaor','ptc','ppres','pimpf','paor','psubj','piaor','pinf'];
+const ADV_X=['s','m','i','ps','pc','no'];
+$('adv-c').innerHTML=$('m-c').innerHTML;
+function advEntry(){
+  const v=id=>$('adv-'+id).value.trim();
+  const l=v('l');if(!l)throw new Error('Scrivi il verbo');
+  const e={forms:l.split('/').map(x=>x.trim()),cls:v('c'),gloss:v('g'),O:{}};
+  ['a','p',...ADV_X].forEach(k=>{if(v(k))e[k]=v(k);});
+  ADV_O.forEach(k=>{if(v(k))e.O[k]=v(k).split(',').map(x=>x.trim().replace(/\s*\/\s*/g,' / '));});
+  return e;
+}
+function advLine(){try{return entryToDsl(advEntry());}catch(_){return '';}}
+function advRefresh(){$('adv-out').textContent=advLine()||'—';}
+$('ov-adv').addEventListener('input',advRefresh);
+$('adv-open').onclick=()=>{
+  ovlClose();
+  const d=$('m-d').value.trim();
+  if(d){try{const e=parseDslLine(d);
+    $('adv-l').value=e.forms.join('/');$('adv-c').value=e.cls;$('adv-g').value=e.gloss;
+    ['a','p',...ADV_X].forEach(k=>$('adv-'+k).value=e[k]||'');
+    ADV_O.forEach(k=>$('adv-'+k).value=e.O[k]?e.O[k].map(x=>x.replace(/ \/ /g,'/')).join(','):'');}catch(_){}}
+  else{$('adv-l').value=$('m-l').value;$('adv-c').value=$('m-c').value;$('adv-g').value=$('m-g').value;$('adv-a').value=$('m-a').value;$('adv-p').value=$('m-p').value;}
+  $('adv-prev').innerHTML='';advRefresh();$('ov-adv').hidden=false;
+};
+$('adv-pv').onclick=()=>{
+  try{const e=parseDslLine(advLine()||advEntry());e._origin='preview';renderEntry($('adv-prev'),e,'act');}
+  catch(err){$('adv-prev').innerHTML=`<p class="warn">${esc(err.message)}</p>`;}
+};
+$('adv-ok').onclick=()=>{
+  try{advEntry();}catch(err){$('adv-prev').innerHTML=`<p class="warn">${esc(err.message)}</p>`;return;}
+  $('m-d').value=advLine();
+  $('m-l').value=$('adv-l').value;$('m-c').value=$('adv-c').value;$('m-g').value=$('adv-g').value;
+  $('adv-state').hidden=false;ovlClose();toast('Forma avanzata applicata');
+};
+$('adv-off').onclick=ev=>{ev.preventDefault();$('m-d').value='';$('adv-state').hidden=true;};
+
 $('m-pv').onclick=()=>{
   try{const e=manualEntry();e._origin='preview';renderEntry($('mprev'),e,'act');}
   catch(err){$('mprev').innerHTML=`<p class="warn">${esc(err.message)}</p>`;}
@@ -323,7 +360,7 @@ $('mf').onsubmit=async ev=>{
     const e=manualEntry();
     if(!safeConj(e))throw new Error('Con questi dati non è possibile coniugare il verbo');
     const s=await saveUser(e,{source:'manual'});
-    $('mprev').innerHTML='';$('mf').reset();toast('Salvato: '+s.lemma);
+    $('mprev').innerHTML='';$('mf').reset();$('adv-state').hidden=true;toast('Salvato: '+s.lemma);
     go('cerca');$('q').value=s.lemma;search(s.lemma);
   }catch(err){$('mprev').innerHTML=`<p class="warn">${esc(err.message)}</p>`;}
 };
@@ -349,6 +386,11 @@ $('clr').onclick=async()=>{
 $('afilter').oninput=renderArchive;
 
 /* ---------- navigazione ---------- */
+const EXAMPLES=['γράφω','αγαπώ','θεωρώ','έρχομαι','κοιμάμαι','γεννιέμαι','ασχολούμαι','είμαι'];
+function renderChips(){
+  $('chips').innerHTML=EXAMPLES.map(x=>{const h=INDEX.get(keyOf(x));return `<button type="button" data-v="${x}">${h?`<b class="cls">${h.e.cls}</b>`:''}<span lang="el">${x}</span></button>`;}).join('');
+  $('chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ovlClose();go('cerca');$('q').value=b.dataset.v;search(b.dataset.v);window.scrollTo(0,0);});
+}
 function go(tab){
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!=='tab-'+tab);
@@ -357,8 +399,6 @@ function go(tab){
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
 $('f').addEventListener('submit',ev=>{ev.preventDefault();search($('q').value);});
 $('q').addEventListener('input',()=>suggest($('q').value));
-$('chips').innerHTML=['γράφω','αγαπώ','κάνω','πηγαίνω','έρχομαι','λέω','είμαι','κοιμάμαι'].map(x=>`<button type="button" lang="el">${x}</button>`).join('');
-$('chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ovlClose();go('cerca');$('q').value=b.textContent;search(b.textContent);window.scrollTo(0,0);});
 
 initClearable();
 loadAll().then(()=>{window.__ready=true;});

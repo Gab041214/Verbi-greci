@@ -322,8 +322,12 @@ function serializeEntry(e){
 }
 function buildIndex(list){
   const idx=new Map();
+  /* 1ª passata: i verbi di partenza hanno la precedenza */
   list.forEach(e=>{
     e.keys.forEach(f=>{const k=keyOf(f);if(!idx.has(k))idx.set(k,{e,voice:e.cls.startsWith('D')?'pass':'act'});});
+  });
+  /* 2ª passata: presente passivo dei verbi attivi, solo se la forma è libera */
+  list.forEach(e=>{
     try{
       const vs=conjugate(e);
       e._voices=vs;
