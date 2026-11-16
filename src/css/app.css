@@ -160,3 +160,28 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--j-ring);border-c
 .sw.drag .item{background:var(--card)}
 .sw-del{position:absolute;top:0;right:0;bottom:0;width:104px;border:0;border-radius:18px;background:var(--bad);color:#fff;font:inherit;font-weight:700;padding-left:36px;text-align:center;opacity:0;pointer-events:none;cursor:pointer}
 .sw.drag .sw-del{opacity:1;pointer-events:auto}
+
+/* pulsante informazioni a fine pagina */
+footer{display:flex;justify-content:center;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+.ovl[hidden]{display:none}
+.info-btn{width:44px;height:44px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;color:var(--ink);font:inherit;cursor:pointer;background:var(--j-fill);border:0.33px solid var(--j-ring);border-left-width:1px;border-right-width:1px;-webkit-backdrop-filter:blur(22px) saturate(1.7);backdrop-filter:blur(22px) saturate(1.7);box-shadow:var(--n-drop)}
+
+/* barra in alto: tab più strette + pulsante impostazioni */
+.bar{position:relative;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.bar .tabs{flex:1;margin-bottom:0;min-width:0}
+.bar .info-btn{flex:none;width:48px;height:48px}
+.bar .menu-vetro{position:absolute;top:56px;right:58px;z-index:15;min-width:200px;padding:6px;border-radius:22px}
+.bar .menu-vetro[hidden]{display:none}
+.bar .menu-vetro button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);font:inherit;font-size:1rem;padding:12px 14px;border-radius:16px;cursor:pointer}
+.bar .menu-vetro button:active{background:var(--j-pill)}
+.bar .menu-vetro{background:var(--j-fill-strong);border:0.33px solid var(--j-ring);border-left-width:1px;border-right-width:1px;box-shadow:0 18px 48px rgba(20,20,40,.28);-webkit-backdrop-filter:blur(22px) saturate(1.7);backdrop-filter:blur(22px) saturate(1.7)}
+.bar .menu-vetro p{margin:0;padding:10px 14px;font-size:.92rem}
+
+/* menu impostazioni: voci */
+.bar .menu-vetro{min-width:250px}
+.bar .menu-vetro label{display:block;width:100%;box-sizing:border-box;text-align:left;color:var(--ink);font-size:1rem;padding:12px 14px;border-radius:16px;cursor:pointer}
+.bar .menu-vetro label:active{background:var(--j-pill)}
+.bar .menu-vetro .danger{color:var(--bad)}
+.bar .menu-vetro hr{border:0;border-top:1px solid var(--j-ring);margin:4px 10px;opacity:.5}
+.pop{max-height:86vh;overflow:auto}
+.pop .exs{margin:10px 0 0}
