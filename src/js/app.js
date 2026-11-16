@@ -153,6 +153,24 @@ function openEditor(e,voiceId){
   };
 }
 
+/* ---------- pop-up informazioni ---------- */
+const ovlClose=()=>document.querySelectorAll('.ovl').forEach(x=>{if(x.id==='gl')x.remove();else x.hidden=true;});
+(function(){
+  const mb=$('set-btn'),mn=$('set-menu');if(!mb)return;
+  const menu=open=>{mn.hidden=!open;mb.setAttribute('aria-expanded',open?'true':'false');};
+  const open=id=>{menu(false);ovlClose();const o=$(id);o.hidden=false;const c=o.querySelector('[data-close]');c&&c.focus();};
+  mb.onclick=ev=>{ev.stopPropagation();menu(mn.hidden);};
+  $('info-btn').onclick=()=>open('info');
+  mn.querySelectorAll('[data-ovl]').forEach(b=>b.addEventListener('click',()=>open(b.dataset.ovl)));
+  mn.addEventListener('click',ev=>{if(ev.target.closest('button')&&!ev.target.closest('[data-ovl]'))menu(false);});
+  $('imp').addEventListener('change',()=>menu(false));
+  document.addEventListener('click',ev=>{if(!mn.hidden&&!mn.contains(ev.target))menu(false);});
+  document.querySelectorAll('.ovl').forEach(o=>{
+    o.addEventListener('click',ev=>{if(ev.target===o||ev.target.closest('[data-close]'))o.hidden=true;});
+  });
+  document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ovlClose();menu(false);}});
+})();
+
 /* ---------- pop-up: correggi traduzione ---------- */
 function openGloss(e){
   closeGloss();
@@ -254,8 +272,8 @@ $('wf').onsubmit=async ev=>{
 $('pgo').onclick=()=>{
   const t=$('pt').value.trim(),p=$('pp').value;
   if(!t||!p.trim()){toast('Serve il verbo e la tabella incollata');return;}
-  try{const {entry,report}=parsePastedText(p,t);showPreview($('prev'),entry,report);$('prev').scrollIntoView({block:'start'});}
-  catch(err){failBox($('prev'),err,'Tabella non letta');}
+  try{const {entry,report}=parsePastedText(p,t);ovlClose();go('aggiungi');showPreview($('prev'),entry,report);$('prev').scrollIntoView({block:'start'});}
+  catch(err){ovlClose();go('aggiungi');failBox($('prev'),err,'Tabella non letta');}
 };
 let stopBulk=false,bulkCont=null;
 $('bulk').onclick=async()=>{
@@ -340,7 +358,7 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.
 $('f').addEventListener('submit',ev=>{ev.preventDefault();search($('q').value);});
 $('q').addEventListener('input',()=>suggest($('q').value));
 $('chips').innerHTML=['γράφω','αγαπώ','κάνω','πηγαίνω','έρχομαι','λέω','είμαι','κοιμάμαι'].map(x=>`<button type="button" lang="el">${x}</button>`).join('');
-$('chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('q').value=b.textContent;search(b.textContent);});
+$('chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ovlClose();go('cerca');$('q').value=b.textContent;search(b.textContent);window.scrollTo(0,0);});
 
 initClearable();
 loadAll().then(()=>{window.__ready=true;});
