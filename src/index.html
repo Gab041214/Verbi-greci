@@ -49,19 +49,18 @@
 
   <h2>Inserimento manuale</h2>
   <form id="mf" class="grid2" autocomplete="off">
-    <label>Verbo (1ª sing. pres.)<input id="m-l" lang="el" required spellcheck="false"></label>
+    <label>Verbo (1ª sing. pres.)<input id="m-l" lang="el" spellcheck="false"></label>
     <label>Classe<select id="m-c"></select></label>
     <label class="span">Significato<input id="m-g"></label>
     <label>Tema aoristo att. <em>(a)</em><input id="m-a" lang="el" placeholder="es. γράψ" spellcheck="false"></label>
     <label>Tema aoristo pass. <em>(p)</em><input id="m-p" lang="el" placeholder="es. γραφ" spellcheck="false"></label>
-    <label class="span">Forma DSL avanzata <em>(sostituisce i campi sopra)</em><textarea id="m-d" rows="2" class="full" placeholder="lemma | classe | significato | a=… | O.aor=…"></textarea></label>
-    <div class="span row wrapbtn"><button type="button" id="m-pv" class="btn">Anteprima</button><button class="btn pri">Salva</button></div>
+    <p class="span mute" id="adv-state" hidden>Forma avanzata attiva · <a href="#" id="adv-off">togli</a></p><textarea id="m-d" hidden></textarea>
+    <div class="span row wrapbtn mfacts"><button type="button" id="adv-open" class="btn">Forma avanzata</button><button type="button" id="m-pv" class="btn">Anteprima</button><button class="btn pri">Salva</button></div>
   </form>
-  <details class="box"><summary>Guida alle classi</summary><div id="classhelp" class="mute"></div></details>
   <div id="mprev"></div>
 </section>
 
-<div class="ovl" id="info" hidden><div class="pop" role="dialog" aria-modal="true" aria-labelledby="info-t"><h3 id="info-t">Informazioni</h3><p>Forme ricavate da regole e da un lessico curato; i verbi importati da Wiktionary si possono correggere dalla scheda del verbo. Le forme tra parentesi (ε) sono facoltative; «/» separa le varianti.</p><p class="mute"><span id="count"></span></p><details class="exs"><summary>Esempi di classi verbali</summary><div id="chips"></div></details><div class="row wrapbtn"><button type="button" class="btn" id="info-x" data-close>Chiudi</button></div></div></div>
+<div class="ovl" id="info" hidden><div class="pop" role="dialog" aria-modal="true" aria-labelledby="info-t"><h3 id="info-t">Informazioni</h3><p>Forme ricavate da regole e da un lessico curato; i verbi importati da Wiktionary si possono correggere dalla scheda del verbo. Le forme tra parentesi (ε) sono facoltative; «/» separa le varianti.</p><p class="mute"><span id="count"></span></p><details class="exs"><summary>Esempi di classi verbali</summary><div id="chips"></div></details><details class="exs"><summary>Guida alle classi</summary><div id="classhelp" class="mute"></div></details><div class="row wrapbtn"><button type="button" class="btn" id="info-x" data-close>Chiudi</button></div></div></div>
 <div class="ovl" id="ov-bulk" hidden><div class="pop" role="dialog" aria-modal="true" aria-label="Importazione di massa da Wiktionary"><h3>Importazione di massa da Wiktionary</h3>
     <p class="mute">Scarica tutti i verbi della categoria uno alla volta. Può richiedere molto tempo: puoi fermarla e riprendere, i verbi già presenti vengono saltati.</p>
     <div class="row wrapbtn"><button type="button" id="bulk" class="btn">Avvia</button><button type="button" id="bulkstop" class="btn" disabled>Ferma</button></div>
@@ -73,6 +72,17 @@
     <button type="button" id="pgo" class="btn">Analizza</button>
   <div class="row wrapbtn"><button type="button" class="btn" data-close>Chiudi</button></div></div></div>
 </div>
+<div class="ovl" id="ov-adv" hidden><div class="pop wide" role="dialog" aria-modal="true" aria-label="Forma avanzata"><h3>Forma avanzata</h3>
+<p class="mute">Compila solo ciò che il verbo ha di irregolare: i campi vuoti li calcola il programma. Più forme si separano con la virgola, le varianti con «/».</p>
+<div class="grid2"><label>Verbo<input id="adv-l" lang="el" spellcheck="false" autocapitalize="off"></label><label>Classe<select id="adv-c"></select></label>
+<label class="span">Significato<input id="adv-g"></label>
+<label>Tema aoristo att. <em>(a)</em><input id="adv-a" lang="el" spellcheck="false" autocapitalize="off"></label><label>Tema aoristo pass. <em>(p)</em><input id="adv-p" lang="el" spellcheck="false" autocapitalize="off"></label></div>
+<details class="box" open><summary>Forme irregolari attive</summary><div class="grid2"><label>Presente <em>(6 forme)</em><input id="adv-pres" lang="el" spellcheck="false" autocapitalize="off"></label><label>Imperfetto <em>(6 forme)</em><input id="adv-impf" lang="el" spellcheck="false" autocapitalize="off"></label><label>Aoristo <em>(6 forme)</em><input id="adv-aor" lang="el" spellcheck="false" autocapitalize="off"></label><label>Cong. aoristo <em>(6 forme)</em><input id="adv-subj" lang="el" spellcheck="false" autocapitalize="off"></label><label>Imperat. presente <em>(2 forme)</em><input id="adv-ipres" lang="el" spellcheck="false" autocapitalize="off"></label><label>Imperat. aoristo <em>(2 forme)</em><input id="adv-iaor" lang="el" spellcheck="false" autocapitalize="off"></label><label>Gerundio <em>(1 forma)</em><input id="adv-ptc" lang="el" spellcheck="false" autocapitalize="off"></label></div></details>
+<details class="box"><summary>Forme irregolari passive</summary><div class="grid2"><label>Presente pass. <em>(6 forme)</em><input id="adv-ppres" lang="el" spellcheck="false" autocapitalize="off"></label><label>Imperf. pass. <em>(6 forme)</em><input id="adv-pimpf" lang="el" spellcheck="false" autocapitalize="off"></label><label>Aoristo pass. <em>(6 forme)</em><input id="adv-paor" lang="el" spellcheck="false" autocapitalize="off"></label><label>Cong. pass. <em>(6 forme)</em><input id="adv-psubj" lang="el" spellcheck="false" autocapitalize="off"></label><label>Imperat. pass. <em>(2 forme)</em><input id="adv-piaor" lang="el" spellcheck="false" autocapitalize="off"></label><label>Infinito pass. <em>(1 forma)</em><input id="adv-pinf" lang="el" spellcheck="false" autocapitalize="off"></label></div></details>
+<details class="box"><summary>Altro</summary><div class="grid2"><label>Radice congiuntivo <em>(s)</em><input id="adv-s" lang="el" spellcheck="false" autocapitalize="off"></label><label>Participio perfetto <em>(m)</em><input id="adv-m" lang="el" spellcheck="false" autocapitalize="off"></label><label>Radice imperativo pass. <em>(i)</em><input id="adv-i" lang="el" spellcheck="false" autocapitalize="off"></label><label>Radice presente pass. <em>(ps)</em><input id="adv-ps" lang="el" spellcheck="false" autocapitalize="off"></label><label>Classe passiva <em>(pc)</em><input id="adv-pc" lang="el" spellcheck="false" autocapitalize="off"></label><label>Tempi assenti <em>(no)</em><input id="adv-no" lang="el" spellcheck="false" autocapitalize="off"></label></div></details>
+<div class="mute">Stringa generata</div><code id="adv-out" class="advout"></code>
+<div id="adv-prev"></div>
+<div class="row wrapbtn"><button type="button" class="btn" id="adv-pv">Anteprima</button><button type="button" class="btn pri" id="adv-ok">Applica</button><button type="button" class="btn" data-close>Chiudi</button></div></div></div>
 <div id="toast" role="status"></div>
 <script type="module" src="js/app.js"></script>
 </body></html>
