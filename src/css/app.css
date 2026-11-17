@@ -213,3 +213,11 @@ footer{display:flex;justify-content:center;padding-bottom:calc(8px + env(safe-ar
 .bar .menu-vetro:not([hidden]){transform-origin:calc(100% - 24px) 0;animation:ios-in .38s cubic-bezier(.2,.9,.25,1) backwards}
 .bar .menu-vetro.closing{pointer-events:none;animation:ios-out .18s ease-in forwards}
 @media (prefers-reduced-motion:reduce){.ovl:not([hidden]) .pop,.ovl.closing .pop,.bar .menu-vetro:not([hidden]),.bar .menu-vetro.closing{animation:none}}
+
+/* ricerca per qualsiasi forma */
+.hit{background:var(--j-pill);border-radius:8px;box-shadow:0 0 0 4px var(--j-pill);font-weight:700}
+.cands{display:flex;flex-direction:column;margin-top:8px;border-radius:22px;overflow:hidden;background:var(--j-fill-strong);border:0.33px solid var(--j-ring);box-shadow:var(--n-drop)}
+.cands button{display:flex;justify-content:space-between;gap:10px;text-align:left;padding:12px 16px;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--ink);font:inherit;font-size:1rem;cursor:pointer}
+.cands button:last-child{border-bottom:0}
+.cands em{color:var(--mute);font-style:normal;font-size:.85rem;text-align:right}
+.formnote{margin-bottom:10px}
