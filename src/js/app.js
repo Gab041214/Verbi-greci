@@ -397,6 +397,8 @@ function go(tab){
   if(tab==='archivio')renderArchive();
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
+$('q-clear').onclick=()=>{const q=$('q');q.value='';q.dispatchEvent(new Event('input',{bubbles:true}));$('out').innerHTML='';$('sugg').innerHTML='';current=null;window.scrollTo(0,0);};
+$('w-clear').onclick=()=>{const w=$('wq');w.value='';w.dispatchEvent(new Event('input',{bubbles:true}));$('prev').innerHTML='';$('mprev').innerHTML='';window.scrollTo(0,0);};
 $('f').addEventListener('submit',ev=>{ev.preventDefault();search($('q').value);});
 $('q').addEventListener('input',()=>suggest($('q').value));
 
