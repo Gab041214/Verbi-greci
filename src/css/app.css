@@ -197,3 +197,5 @@ footer{display:flex;justify-content:center;padding-bottom:calc(8px + env(safe-ar
 
 #chips button{display:inline-flex;align-items:center;gap:8px}
 #chips .cls{font-size:.72rem;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:999px;background:var(--j-pill);color:var(--ink)}
+/* pulsanti accanto ai campi: stessa misura */
+#f button,#wf .btn{font-size:.95rem;font-weight:600;padding-left:14px;padding-right:14px;white-space:nowrap;flex:none}
