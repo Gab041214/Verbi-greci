@@ -41,13 +41,20 @@ export function textToRows(text){
   }).filter(r=>!r.every(c=>/^[-: ]*$/.test(c)));
 }
 /* una cella -> "forma / variante" (solo parole greche; scarta [..], (variante rara), —, "θα …") */
-export function cleanCell(s){
-  if(!s)return '';
-  s=s.replace(/\[[^\]]*\]/g,'').replace(/➤/g,'').replace(/[—–]/g,'');
+function splitForms(s){
+  s=s.replace(/➤/g,'').replace(/[—–]/g,'');
   s=s.replace(/\s+-\s*|\s*-\s+/g,', ');   // «forma - variante colloquiale»
   const toks=s.split(/\s*[,;\/]\s*/).map(t=>t.trim()).filter(Boolean)
     .filter(t=>GREEK_FORM.test(t));
   return [...new Set(toks)].join(' / ');
+}
+export function cleanCell(s){
+  if(!s)return '';
+  const main=splitForms(s.replace(/\[[^\]]*\]/g,''));
+  if(main)return main;
+  /* solo forme tra [parentesi quadre] (poco usate): meglio di una cella vuota */
+  const br=[...s.matchAll(/\[([^\]]*)\]/g)].map(m=>m[1]).join(',');
+  return splitForms(br);
 }
 const PRON={'εγώ':'1 sg','εσύ':'2 sg','εμείς':'1 pl','εσείς':'2 pl'};
 /* normalizza l'etichetta di riga: "1st person singular" / "1st sg." / "εγώ" -> "1 sg" */
