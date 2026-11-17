@@ -113,3 +113,17 @@ test('cleanCell: forme solo tra parentesi quadre vengono tenute, altrimenti scar
   assert.equal(cleanCell('καλούνταν, {καλείτο}'),'καλούνταν');
   assert.equal(cleanCell('γράφουμε, [γράφομε]'),'γράφουμε');
 });
+
+test('nota di rimando «(προλαμβάνω →)» nella cella e tabella solo attiva (προλαβαίνω)',()=>{
+  const lines=readFileSync(new URL('./fixtures/prolavaino.diag.txt',import.meta.url),'utf8').split('\n').slice(5);
+  const rows=lines.map(l=>l.split(' | ').map(c=>c.trim()));
+  const {entry,report}=rowsToEntry(rows,'προλαβαίνω');
+  assert.equal(entry.cls,'A');
+  assert.deepEqual(report.missing,[]);
+  assert.equal(entry.O.pres[0],'προλαβαίνω');
+  assert.equal(entry.O.pres[5],'προλαβαίνουν(ε)');
+  assert.equal(entry.O.aor[0],'πρόλαβα');
+  assert.deepEqual(entry.O.ipres,['προλάβαινε','προλαβαίνετε']);
+  assert.equal(cleanCell('προλαβαίνω (προλαμβάνω →)'),'προλαβαίνω');
+  assert.equal(cleanCell('προλαβαίνουν(ε)'),'προλαβαίνουν(ε)');
+});
