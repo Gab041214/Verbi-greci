@@ -319,11 +319,12 @@ function failBox(el,err,intro){
 function showPreview(el,entry,report){
   entry._origin='preview';
   const gl=esc(entry.gloss||'');
-  el.innerHTML=reportHtml(report)+'<div id="pv-card"></div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(da Wiktionary, in inglese: sostituiscilo con la traduzione)</em>':'')+'<input id="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri" id="pv-s">Salva nell\'archivio</button><button type="button" class="btn" id="pv-x">Scarta</button></div>';
-  renderEntry($('pv-card'),entry,'act');
-  $('pv-x').onclick=()=>{el.innerHTML='';};
-  $('pv-s').onclick=async()=>{
-    const g=$('pv-g').value.trim();
+  el.innerHTML=reportHtml(report)+'<div class="pv-card"></div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(da Wiktionary, in inglese: sostituiscilo con la traduzione)</em>':'')+'<input class="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri pv-s">Salva nell\'archivio</button><button type="button" class="btn pv-x">Scarta</button></div>';
+  const q=sel=>el.querySelector(sel);
+  renderEntry(q('.pv-card'),entry,'act');
+  q('.pv-x').onclick=()=>{el.innerHTML='';};
+  q('.pv-s').onclick=async()=>{
+    const g=q('.pv-g').value.trim();
     if(g)entry.gloss=g;
     const sv=await saveUser(entry,{});const inSearch=el===$('out');el.innerHTML='';$('wq').value='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,'act');}
   };
