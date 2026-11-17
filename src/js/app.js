@@ -1,7 +1,7 @@
-import {loadLexicon,finalizeEntry,parseDslLine,entryToDsl,buildIndex,conjugate,guessEntry,keyOf,overrideKey,CLASS_DESC} from './engine.js';
+import {loadLexicon,finalizeEntry,parseDslLine,entryToDsl,buildIndex,buildFormIndex,formVariants,conjugate,guessEntry,keyOf,overrideKey,CLASS_DESC} from './engine.js';
 import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
-import {fetchVerb,listVerbs,parsePastedText} from './wiktionary.js';
+import {fetchVerb,lookupForm,listVerbs,parsePastedText} from './wiktionary.js';
 import {fromHeadword} from './headword.js';
 import {initClearable} from './clearable.js';
 
@@ -14,7 +14,7 @@ const glossIsEn=e=>!!e.gloss_en&&e.gloss===e.gloss_en;
 const EN_TAG=' <span class="tag warn" title="Significato in inglese: correggilo in italiano">EN</span>';
 const SRC={base:'Lessico',extra:'Repository',wiktionary:'Wiktionary',manual:'Manuale',user:'Mio'};
 
-let BASE=[],EXTRA=[],USER=[],LIST=[],INDEX=new Map(),BYID=new Map();
+let BASE=[],EXTRA=[],USER=[],LIST=[],INDEX=new Map(),FORMS=new Map(),BYID=new Map();
 let current=null;
 
 /* ---------- dati ---------- */
@@ -25,7 +25,7 @@ function rebuild(){
     for(const e of arr){e._origin=origin;m.set(keyOf(e.forms[0]),e);}
   }
   LIST=[...m.values()].sort((a,b)=>keyOf(a.lemma).localeCompare(keyOf(b.lemma),'el'));
-  BYID=m;INDEX=buildIndex(LIST);if(typeof renderChips==='function'&&$('chips'))renderChips();
+  BYID=m;INDEX=buildIndex(LIST);FORMS=buildFormIndex(LIST);if(typeof renderChips==='function'&&$('chips'))renderChips();
   $('count').textContent=LIST.length+' verbi in archivio.';
   $('acount').textContent=LIST.length+' verbi';
 }
@@ -95,24 +95,78 @@ async function delUser(e){
   if(current&&keyOf(current.forms[0])===keyOf(e.forms[0]))$('out').innerHTML='';
   renderArchive();toast('Eliminato');return true;
 }
-function search(q){
+let searchSeq=0;
+function formNote(q,h){
+  const k=keyOf(q),tags=h.tags.join(' · ');
+  $('out').insertAdjacentHTML('afterbegin',`<p class="msg formnote">«<b lang="el">${esc(q.trim())}</b>» è una forma di <b lang="el">${esc(h.e.display)}</b>: ${esc(tags)}</p>`);
+  /* evidenzia la forma nelle tabelle */
+  $('out').querySelectorAll('*').forEach(el=>{
+    if(el.children.length||el.closest('.formnote'))return;
+    if(formVariants(el.textContent).some(w=>keyOf(w)===k))el.classList.add('hit');
+  });
+  const first=$('out').querySelector('.hit');
+  if(first)first.scrollIntoView({block:'center',behavior:'smooth'});
+}
+function candidates(q,list,note){
+  $('out').innerHTML=`<p class="msg">«<b lang="el">${esc(q.trim())}</b>» ${note||'può essere una forma di più verbi'}:</p><div class="cands">`+
+    list.map(h=>`<button type="button" data-l="${esc(h.e?h.e.lemma:h.title)}" data-v="${h.voice||'act'}" data-q="${esc(q.trim())}"><span lang="el"><b>${esc(h.e?h.e.display:h.title)}</b></span><em>${esc(h.e?`${h.e.gloss} · ${h.tags.join(' · ')}`:h.desc)}</em></button>`).join('')+`</div>`;
+  $('out').querySelectorAll('.cands button').forEach(b=>b.onclick=()=>pickLemma(b.dataset.l,b.dataset.v,b.dataset.q));
+}
+async function pickLemma(l,voice,q){
+  const hit=INDEX.get(keyOf(l));
+  if(hit){show(hit.e,voice||hit.voice);const fh=FORMS.get(keyOf(q||''));const h=fh&&fh.find(x=>x.e===hit.e);if(h)formNote(q,h);return;}
+  $('out').innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
+  try{const {entry,report}=await importOne(l);showPreview($('out'),entry,report);}
+  catch(err){failBox($('out'),err,'Importazione non riuscita');}
+}
+async function search(q){
+  const seq=++searchSeq;
   const k=keyOf(q);if(!k){$('out').innerHTML='';return;}
   $('sugg').innerHTML='';
   const hit=INDEX.get(k);
   if(hit){show(hit.e,hit.voice);return;}
-  $('wq').value=q.trim();   // verbo non nel database: precompila il campo di importazione
+  const fh=FORMS.get(k);
+  if(fh&&fh.length===1){show(fh[0].e,fh[0].voice);formNote(q,fh[0]);return;}
+  if(fh&&fh.length>1){candidates(q,fh);return;}
+  /* non è nell'archivio: provo su Wiktionary */
+  $('wq').value=q.trim();
+  $('out').innerHTML='<p class="msg">Non è nell\'archivio: cerco su Wiktionary…</p>';
+  let res=null;
+  try{res=await lookupForm(q.trim());}catch(_){res=null;}
+  if(seq!==searchSeq)return;
+  if(res&&res.kind==='forms'){candidates(q,res.lemmas,'è una forma di');return;}
+  if(res&&res.kind==='lemma'){
+    let {entry,report}=res;
+    if(entry.fromHeadword){const r=fromHeadword(entry);entry=r.entry;report={found:[],missing:[],noTable:true,notes:r.notes};}
+    showPreview($('out'),entry,report);return;
+  }
   const g=guessEntry(q);
   if(g){g._origin='guess';show(g,'act');return;}
-  $('out').innerHTML=`<p class="msg">Verbo non trovato. Scrivi la 1ª persona singolare del presente indicativo, ad esempio <b lang="el">γράφω</b>, <b lang="el">αγαπώ</b> o <b lang="el">έρχομαι</b>.</p>`;
+  $('out').innerHTML=`<p class="msg">Non trovo «<b lang="el">${esc(q.trim())}</b>» né nell'archivio né su Wiktionary. Prova con un'altra forma del verbo, ad esempio <b lang="el">γράφω</b>, <b lang="el">αγαπώ</b> o <b lang="el">έρχομαι</b>.</p>`;
 }
 function suggest(q){
   const k=keyOf(q);if(!k){$('sugg').innerHTML='';return;}
-  const out=[];
+  const out=[];const seen=new Set();
   for(const e of LIST){
-    if(e.keys.some(f=>keyOf(f).startsWith(k))){out.push(e);if(out.length>=6)break;}
+    if(e.keys.some(f=>keyOf(f).startsWith(k))){out.push({e,q:e.lemma,tag:e.gloss});seen.add(e);if(out.length>=6)break;}
   }
-  $('sugg').innerHTML=out.map(e=>`<button type="button" data-l="${esc(e.lemma)}"><span lang="el">${esc(e.display)}</span><em>${esc(e.gloss)}</em></button>`).join('');
-  $('sugg').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('q').value=b.dataset.l;search(b.dataset.l);});
+  if(out.length<6){
+    for(const [fk,arr] of FORMS){
+      if(!fk.startsWith(k))continue;
+      for(const h of arr){
+        if(seen.has(h.e))continue;seen.add(h.e);
+        out.push({e:h.e,q:h.w,tag:`forma di ${h.e.display}`,form:true});
+        if(out.length>=6)break;
+      }
+      if(out.length>=6)break;
+    }
+  }
+  $('sugg').innerHTML=out.map((o,i)=>`<button type="button" data-i="${i}"><span lang="el">${esc(o.form?o.q:o.e.display)}</span><em>${esc(o.tag)}</em></button>`).join('');
+  $('sugg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const o=out[+b.dataset.i];
+    /* per le forme cerco quella digitata, non la chiave senza accenti */
+    $('q').value=o.q;search(o.q);
+  });
 }
 
 /* ---------- editor delle forme ---------- */
@@ -269,7 +323,7 @@ function showPreview(el,entry,report){
   $('pv-s').onclick=async()=>{
     const g=$('pv-g').value.trim();
     if(g)entry.gloss=g;
-    await saveUser(entry,{});el.innerHTML='';$('wq').value='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);
+    const sv=await saveUser(entry,{});const inSearch=el===$('out');el.innerHTML='';$('wq').value='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,'act');}
   };
 }
 async function importOne(title){

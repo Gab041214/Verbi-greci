@@ -246,6 +246,32 @@ export async function fetchVerb(title,f=fetch){
   const j=await api({action:'parse',page:title,prop:'text',redirects:'1'},f);
   return parseGreekVerbHtml(j.parse.text,title);
 }
+/* rimandi «forma di …» nella sezione Greek: verbi a cui appartiene una forma flessa */
+export function formOfLemmas(sec,title){
+  const out=[];
+  for(const li of sec.matchAll(/<li[\s\S]*?<\/li>/gi)){
+    if(!/form-of/.test(li[0]))continue;
+    const desc=htmlText(li[0]).slice(0,140);
+    for(const a of li[0].matchAll(/<a\b[^>]*\btitle="([^"]+)"/gi)){
+      const t=decode(a[1]);
+      if(t===title||!/^[α-ωά-ώϊϋΐΰ]+$/i.test(t))continue;
+      if(!out.some(x=>x.title===t))out.push({title:t,desc});
+    }
+  }
+  return out;
+}
+/* cerca una forma qualsiasi: restituisce {kind:'lemma',entry,report} oppure {kind:'forms',lemmas:[{title,desc}]} */
+export async function lookupForm(title,f=fetch){
+  const j=await api({action:'parse',page:title,prop:'text',redirects:'1'},f);
+  const html=j.parse.text;
+  let res=null;
+  try{res=parseGreekVerbHtml(html,title);}catch(_){res=null;}
+  if(res&&res.entry&&res.entry.O&&res.entry.O.pres&&!res.report.noTable)return {kind:'lemma',...res};
+  const lemmas=formOfLemmas(greekSection(html),title);
+  if(lemmas.length)return {kind:'forms',lemmas};
+  if(res)return {kind:'lemma',...res};
+  throw new Error('Nessuna voce greca di verbo per «'+title+'»');
+}
 /* elenco dei verbi greci (Category:Greek verbs), a pagine */
 export async function listVerbs(cont,f=fetch,limit=200){
   const p={action:'query',list:'categorymembers',cmtitle:'Category:Greek_verbs',cmtype:'page',cmlimit:String(limit)};

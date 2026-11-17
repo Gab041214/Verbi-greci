@@ -340,6 +340,47 @@ function buildIndex(list){
   return idx;
 }
 
+/* ===== indice di TUTTE le forme coniugate: forma (senza accenti) -> verbi che la contengono ===== */
+const FTENSE={pres:'presente',impf:'imperfetto',aor:'aoristo',subj:'congiuntivo',inf:'infinito',iaor:'imperativo aoristo',ipres:'imperativo presente',ptc:'gerundio',m:'participio perfetto',pinf:'infinito'};
+const FPERS=['1ª sing.','2ª sing.','3ª sing.','1ª plur.','2ª plur.','3ª plur.'];
+/* "έγραψαν(ε) / έγραψαν" -> ['έγραψαν','έγραψανε'] (la parte tra parentesi è facoltativa) */
+export function formVariants(str){
+  const out=[];
+  for(const t of String(str||'').split('/')){
+    const w=t.trim();if(!w)continue;
+    const m=w.match(/^([^()\s]+)\(([^()\s]+)\)$/);
+    if(m){out.push(m[1],m[1]+m[2]);}
+    else{const x=w.replace(/[()]/g,'').trim();if(x&&!/\s/.test(x))out.push(x);}
+  }
+  return out;
+}
+export function buildFormIndex(list){
+  const idx=new Map();
+  const add=(f,e,voice,tag)=>{
+    const k=keyOf(f);if(!k)return;
+    let arr=idx.get(k);if(!arr){arr=[];idx.set(k,arr);}
+    let h=arr.find(x=>x.e===e);
+    if(!h){h={e,voice,tags:[],w:f};arr.push(h);}
+    if(!h.tags.includes(tag))h.tags.push(tag);
+  };
+  for(const e of list){
+    let vs;try{vs=e._voices||conjugate(e);}catch(_){continue;}
+    for(const v of vs){
+      for(const [f,val] of Object.entries(v.raw)){
+        const tense=FTENSE[f];if(!tense)continue;
+        const pas=v.id==='pass'?' passivo':'';
+        if(Array.isArray(val)){
+          const pers=val.length===2?['2ª sing.','2ª plur.']:FPERS;
+          val.forEach((x,i)=>formVariants(x).forEach(w=>add(w,e,v.id,`${tense}${pas}, ${pers[i]||''}`.replace(/, $/,''))));
+        }else if(typeof val==='string'){
+          formVariants(val).forEach(w=>add(w,e,v.id,`${tense}${pas}`));
+        }
+      }
+    }
+  }
+  return idx;
+}
+
 /* ================= Verbi non in lessico: ipotesi a regole ================= */
 function guessAorist(S,cls){
   if(cls==='B1'||cls==='B2')return S+'ησ';
