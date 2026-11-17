@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {parseGreekVerbHtml,cleanCell,parsePastedText,textToRows,fetchVerb,listVerbs} from '../src/js/wiktionary.js';
+import {lookupForm,formOfLemmas} from '../src/js/wiktionary.js';
 import {finalizeEntry,conjugate} from '../src/js/engine.js';
 const html=readFileSync(new URL('./fixtures/grafo.html',import.meta.url),'utf8');
 test('cleanCell',()=>{
@@ -126,4 +127,14 @@ test('nota di rimando «(προλαμβάνω →)» nella cella e tabella solo 
   assert.deepEqual(entry.O.ipres,['προλάβαινε','προλαβαίνετε']);
   assert.equal(cleanCell('προλαβαίνω (προλαμβάνω →)'),'προλαβαίνω');
   assert.equal(cleanCell('προλαβαίνουν(ε)'),'προλαβαίνουν(ε)');
+});
+
+const FORMPAGE='<h2 id="Greek">Greek</h2><h3 id="Verb">Verb</h3><p class="headword-line"><strong>προλάβαμε</strong></p><ol><li><span class="form-of-definition"><a title="simple past">simple past</a> first-person plural of <span class="form-of-definition-link"><i><a href="/wiki/x" title="προλαβαίνω">προλαβαίνω</a></i></span></span></li></ol>';
+test('pagina di una forma flessa: rimanda al verbo',async()=>{
+  assert.deepEqual(formOfLemmas(FORMPAGE,'προλάβαμε').map(x=>x.title),['προλαβαίνω']);
+  const fake=t=>async()=>({ok:true,json:async()=>({parse:{text:t}})});
+  const r=await lookupForm('προλάβαμε',fake(FORMPAGE));
+  assert.equal(r.kind,'forms');assert.equal(r.lemmas[0].title,'προλαβαίνω');
+  const l=await lookupForm('γράφω',fake(html));
+  assert.equal(l.kind,'lemma');assert.equal(l.entry.O.pres[0],'γράφω');
 });

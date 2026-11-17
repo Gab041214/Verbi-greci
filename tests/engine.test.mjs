@@ -21,3 +21,15 @@ test('ipotesi per verbo sconosciuto',()=>{const g=guessEntry('κουράζω');c
 test('override passivo senza radice p',()=>{
   const e=parseDslLine('δοκιμάζω | A | x | O.ppres=α,β,γ,δ,ε,ζ | O.paor=δοκιμάστηκα,1,2,3,4,5');
   const v=conjugate(e);assert.equal(v.length,2);});
+
+import {buildFormIndex,formVariants,keyOf as kOf,loadLexicon as llex} from '../src/js/engine.js';
+import {LEXICON as LEX} from '../src/js/lexicon.js';
+test('indice delle forme: qualsiasi forma porta al verbo',()=>{
+  const idx=buildFormIndex(llex(LEX));
+  const h=idx.get(kOf('έγραψα'));
+  assert.equal(h.length,1);assert.equal(h[0].e.lemma,'γράφω');assert.ok(h[0].tags[0].startsWith('aoristo'));
+  assert.equal(idx.get(kOf('εγραψες'))[0].e.lemma,'γράφω');          // senza accenti
+  assert.ok(idx.get(kOf('έγραψαν'))&&idx.get(kOf('έγραψανε')));      // «(ε)» facoltativa
+  assert.ok(idx.get(kOf('γεννιεσαι')).length>1);                    // forma comune a più verbi
+  assert.deepEqual(formVariants('έγραψαν(ε) / έγραψαν'),['έγραψαν','έγραψανε','έγραψαν']);
+});
