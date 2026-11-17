@@ -249,13 +249,22 @@ export async function fetchVerb(title,f=fetch){
 /* rimandi «forma di …» nella sezione Greek: verbi a cui appartiene una forma flessa */
 export function formOfLemmas(sec,title){
   const out=[];
+  const add=(t,desc)=>{
+    t=decode(t).trim();
+    if(!t||t===title||!/^[α-ωά-ώϊϋΐΰ]+$/i.test(t))return;
+    if(!out.some(x=>x.title===t))out.push({title:t,desc});
+  };
+  const GRAM=/(person|singular|plural|participle|imperative|infinitive|gerund|simple past|imperfect|aorist|subjunctive|indicative|inflection|form)\b/i;
   for(const li of sec.matchAll(/<li[\s\S]*?<\/li>/gi)){
-    if(!/form-of/.test(li[0]))continue;
-    const desc=htmlText(li[0]).slice(0,140);
-    for(const a of li[0].matchAll(/<a\b[^>]*\btitle="([^"]+)"/gi)){
-      const t=decode(a[1]);
-      if(t===title||!/^[α-ωά-ώϊϋΐΰ]+$/i.test(t))continue;
-      if(!out.some(x=>x.title===t))out.push({title:t,desc});
+    const text=htmlText(li[0]);
+    const formOf=/form-of/.test(li[0])||(GRAM.test(text)&&/\bof\s+[α-ωά-ώ]/i.test(text));
+    if(!formOf)continue;
+    const desc=text.slice(0,140);
+    const before=out.length;
+    for(const a of li[0].matchAll(/<a\b[^>]*\btitle="([^"]+)"/gi))add(a[1],desc);
+    if(out.length===before){                      // nessun collegamento utile: leggo «… of τιμωρώ (timoró)»
+      const m=text.match(/\bof\s+([α-ωά-ώϊϋΐΰ]+)/i);
+      if(m)add(m[1],desc);
     }
   }
   return out;
@@ -270,7 +279,9 @@ export async function lookupForm(title,f=fetch){
   const lemmas=formOfLemmas(greekSection(html),title);
   if(lemmas.length)return {kind:'forms',lemmas};
   if(res)return {kind:'lemma',...res};
-  throw new Error('Nessuna voce greca di verbo per «'+title+'»');
+  const e=new Error('Nessuna voce greca di verbo per «'+title+'»');
+  e.diag=diagnose(html,title);
+  throw e;
 }
 /* elenco dei verbi greci (Category:Greek verbs), a pagine */
 export async function listVerbs(cont,f=fetch,limit=200){

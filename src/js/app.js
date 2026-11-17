@@ -131,8 +131,8 @@ async function search(q){
   /* non è nell'archivio: provo su Wiktionary */
   $('wq').value=q.trim();
   $('out').innerHTML='<p class="msg">Non è nell\'archivio: cerco su Wiktionary…</p>';
-  let res=null;
-  try{res=await lookupForm(q.trim());}catch(_){res=null;}
+  let res=null,lerr=null;
+  try{res=await lookupForm(q.trim());}catch(e){res=null;lerr=e;}
   if(seq!==searchSeq)return;
   if(res&&res.kind==='forms'){candidates(q,res.lemmas,'è una forma di');return;}
   if(res&&res.kind==='lemma'){
@@ -142,6 +142,7 @@ async function search(q){
   }
   const g=guessEntry(q);
   if(g){g._origin='guess';show(g,'act');return;}
+  if(lerr&&lerr.diag){failBox($('out'),lerr,'Forma non trovata');return;}
   $('out').innerHTML=`<p class="msg">Non trovo «<b lang="el">${esc(q.trim())}</b>» né nell'archivio né su Wiktionary. Prova con un'altra forma del verbo, ad esempio <b lang="el">γράφω</b>, <b lang="el">αγαπώ</b> o <b lang="el">έρχομαι</b>.</p>`;
 }
 function suggest(q){
