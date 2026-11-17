@@ -42,6 +42,8 @@ export function textToRows(text){
 }
 /* una cella -> "forma / variante" (solo parole greche; scarta [..], (variante rara), —, "θα …") */
 function splitForms(s){
+  /* note di rimando tipo «(προλαμβάνω →)»: le parentesi con spazi o frecce non fanno parte della forma; «(ε)» invece sì */
+  s=s.replace(/\s*\([^)]*[\s→➤][^)]*\)/g,'');
   s=s.replace(/➤/g,'').replace(/[—–]/g,'');
   s=s.replace(/\s+-\s*|\s*-\s+/g,', ');   // «forma - variante colloquiale»
   const toks=s.split(/\s*[,;\/]\s*/).map(t=>t.trim()).filter(Boolean)
