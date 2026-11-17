@@ -79,12 +79,13 @@ function show(e,voice){
   current=e;
   const actions=`<button type="button" class="btn" data-a="edit">Correggi forme</button>`+
     (e.guessed?'':`<button type="button" class="btn" data-a="gloss">Correggi traduzione</button>`)+
-    (e.guessed?`<button type="button" class="btn pri" data-a="save">Salva nell'archivio</button>`:'');
+    (e.guessed?`<button type="button" class="btn" data-a="paste">Incolla tabella</button><button type="button" class="btn pri" data-a="save">Salva nell'archivio</button>`:'');
   renderEntry($('out'),e,voice,{actions,onVoice:v=>{show.voice=v;}});
   $('out').onclick=ev=>{
     const a=ev.target.dataset&&ev.target.dataset.a;if(!a)return;
     if(a==='edit')openEditor(e,show.voice||voice);
     if(a==='gloss')openGloss(e,ev.target);
+    if(a==='paste'){openOvl('ov-paste',ev.target);$('pt').value=e.lemma;}
     if(a==='save')saveUser(e,{source:'manual'}).then(()=>{toast('Salvato');search(e.lemma);});
   };
   show.voice=voice;
@@ -114,11 +115,10 @@ function candidates(q,list,note,el=$('out')){
 }
 async function pickLemma(l,voice,q,el=$('out')){
   const hit=INDEX.get(keyOf(l));
-  if(hit&&el!==$('out')){go('cerca');$('q').value=l;search(l);return;}
   if(hit){show(hit.e,voice||hit.voice);const fh=FORMS.get(keyOf(q||''));const h=fh&&fh.find(x=>x.e===hit.e);if(h)formNote(q,h);return;}
   el.innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
   try{const {entry,report}=await importOne(l);showPreview(el,entry,report);}
-  catch(err){failBox(el,err,'Importazione non riuscita');}
+  catch(err){failBox(el,err,'Importazione non riuscita',l);}
 }
 async function search(q){
   const seq=++searchSeq;
@@ -130,7 +130,6 @@ async function search(q){
   if(fh&&fh.length===1){show(fh[0].e,fh[0].voice);formNote(q,fh[0]);return;}
   if(fh&&fh.length>1){candidates(q,fh);return;}
   /* non è nell'archivio: provo su Wiktionary */
-  $('wq').value=q.trim();
   $('out').innerHTML='<p class="msg">Non è nell\'archivio: cerco su Wiktionary…</p>';
   let res=null,lerr=null;
   try{res=await lookupForm(q.trim());}catch(e){res=null;lerr=e;}
@@ -143,8 +142,9 @@ async function search(q){
   }
   const g=guessEntry(q);
   if(g){g._origin='guess';show(g,'act');return;}
-  if(lerr&&lerr.diag){failBox($('out'),lerr,'Forma non trovata');return;}
-  $('out').innerHTML=`<p class="msg">Non trovo «<b lang="el">${esc(q.trim())}</b>» né nell'archivio né su Wiktionary. Prova con un'altra forma del verbo, ad esempio <b lang="el">γράφω</b>, <b lang="el">αγαπώ</b> o <b lang="el">έρχομαι</b>.</p>`;
+  if(lerr&&lerr.diag){failBox($('out'),lerr,'Forma non trovata',q);return;}
+  $('out').innerHTML=`<p class="msg">Non trovo «<b lang="el">${esc(q.trim())}</b>» né nell'archivio né su Wiktionary. Prova con un'altra forma del verbo, ad esempio <b lang="el">γράφω</b>, <b lang="el">αγαπώ</b> o <b lang="el">έρχομαι</b>.</p>`+rescue($('out'),q);
+  wireRescue($('out'),q);
 }
 function suggest(q){
   const k=keyOf(q);if(!k){$('sugg').innerHTML='';return;}
@@ -222,6 +222,11 @@ function ovlOrigin(o,src){
   if(!src||!src.getBoundingClientRect){p.style.transformOrigin='50% 0';return;}
   const s=src.getBoundingClientRect();
   p.style.transformOrigin=`${Math.round(s.left+s.width/2-p.offsetLeft)}px ${Math.round(s.top+s.height/2-p.offsetTop)}px`;
+}
+const openOvl=(id,src)=>{ovlClose(true);const o=$(id);o.hidden=false;ovlOrigin(o,src);};
+function openManual(lemma,src){
+  openOvl('ov-manual',src);
+  if(lemma){$('m-l').value=lemma;$('m-l').dispatchEvent(new Event('input',{bubbles:true}));}
 }
 (function(){
   const mb=$('set-btn'),mn=$('set-menu');if(!mb)return;
@@ -311,22 +316,34 @@ function reportHtml(r){
   const miss=(r.missing||[]);
   return miss.length?`<p class="warn">Dati non trovati nella tabella (verranno calcolati con le regole): ${esc(miss.join(', '))}</p>`:'<p class="ok">Tabella letta completamente.</p>';
 }
-function failBox(el,err,intro){
+function rescue(el,verb){
+  const v=(verb||'').trim();
+  return `<div class="row wrapbtn resc"><button type="button" class="btn" data-r="man">Aggiungi a mano</button><button type="button" class="btn" data-r="paste">Incolla tabella</button></div>`;
+}
+function wireRescue(el,verb){
+  const v=(verb||'').trim();
+  el.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{
+    if(b.dataset.r==='man')openManual(v,b);
+    else{openOvl('ov-paste',b);$('pt').value=v;}
+  });
+}
+function failBox(el,err,intro,verb){
   const d=err.diag?`<details class="box"><summary>Dettagli tecnici (da inviare a Claude)</summary><textarea id="diag" rows="8" class="full" readonly>${esc(err.diag)}</textarea><button type="button" class="btn" id="diagcopy">Copia</button></details>`:'';
-  el.innerHTML=`<p class="warn">${esc(intro)}: ${esc(err.message)}.</p>${d}`;
+  el.innerHTML=`<p class="warn">${esc(intro)}: ${esc(err.message)}.</p>${d}`+(verb!==undefined?rescue(el,verb):'');
+  if(verb!==undefined)wireRescue(el,verb);
   const b=$('diagcopy');if(b)b.onclick=async()=>{try{await navigator.clipboard.writeText(err.diag);toast('Copiato');}catch(_){$('diag').select();toast('Seleziona e copia');}};
 }
 function showPreview(el,entry,report){
   entry._origin='preview';
   const gl=esc(entry.gloss||'');
-  el.innerHTML=reportHtml(report)+'<div class="pv-card"></div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(da Wiktionary, in inglese: sostituiscilo con la traduzione)</em>':'')+'<input class="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri pv-s">Salva nell\'archivio</button><button type="button" class="btn pv-x">Scarta</button></div>';
+  el.innerHTML='<div class="box pvbox fix"><div class="pvhead">Anteprima da Wiktionary · non ancora salvato</div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(in inglese: sostituiscilo con la traduzione)</em>':'')+'<input class="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri pv-s">Salva nell\'archivio</button><button type="button" class="btn pv-x">Scarta</button></div></div>'+reportHtml(report)+'<div class="pv-card"></div>';
   const q=sel=>el.querySelector(sel);
   renderEntry(q('.pv-card'),entry,'act');
   q('.pv-x').onclick=()=>{el.innerHTML='';};
   q('.pv-s').onclick=async()=>{
     const g=q('.pv-g').value.trim();
     if(g)entry.gloss=g;
-    const sv=await saveUser(entry,{});const inSearch=el===$('out');el.innerHTML='';$('wq').value='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,'act');}
+    const sv=await saveUser(entry,{});const inSearch=el===$('out');el.innerHTML='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,'act');}
   };
 }
 async function importOne(title){
@@ -338,32 +355,11 @@ async function importOne(title){
   }
   return {entry,report};
 }
-$('wf').onsubmit=async ev=>{
-  ev.preventDefault();
-  const t=$('wq').value.trim();if(!t)return;
-  $('prev').innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
-  try{
-    const res=await lookupForm(t);
-    if(res.kind==='forms'){
-      if(res.lemmas.length===1){
-        const l=res.lemmas[0].title;
-        const {entry,report}=await importOne(l);
-        showPreview($('prev'),entry,report);
-        $('prev').insertAdjacentHTML('afterbegin',`<p class="msg">«<b lang="el">${esc(t)}</b>» è una forma di <b lang="el">${esc(l)}</b>: ecco il verbo.</p>`);
-      }else candidates(t,res.lemmas,'è una forma di',$('prev'));
-      return;
-    }
-    let {entry,report}=res;
-    if(entry.fromHeadword){const r=fromHeadword(entry);entry=r.entry;report={found:[],missing:[],noTable:true,notes:r.notes};}
-    showPreview($('prev'),entry,report);
-  }
-  catch(err){failBox($('prev'),err,'Importazione non riuscita');}
-};
 $('pgo').onclick=()=>{
   const t=$('pt').value.trim(),p=$('pp').value;
   if(!t||!p.trim()){toast('Serve il verbo e la tabella incollata');return;}
-  try{const {entry,report}=parsePastedText(p,t);ovlClose();go('aggiungi');showPreview($('prev'),entry,report);$('prev').scrollIntoView({block:'start'});}
-  catch(err){ovlClose();go('aggiungi');failBox($('prev'),err,'Tabella non letta');}
+  try{const {entry,report}=parsePastedText(p,t);ovlClose();go('cerca');$('q').value=entry.lemma||t;$('sugg').innerHTML='';showPreview($('out'),entry,report);window.scrollTo(0,0);}
+  catch(err){ovlClose();go('cerca');failBox($('out'),err,'Tabella non letta',t);}
 };
 let stopBulk=false,bulkCont=null;
 $('bulk').onclick=async()=>{
@@ -436,8 +432,9 @@ $('adv-ok').onclick=()=>{
   try{advEntry();}catch(err){$('adv-prev').innerHTML=`<p class="warn">${esc(err.message)}</p>`;return;}
   $('m-d').value=advLine();
   $('m-l').value=$('adv-l').value;$('m-c').value=$('adv-c').value;$('m-g').value=$('adv-g').value;
-  $('adv-state').hidden=false;ovlClose();toast('Forma avanzata applicata');
+  $('adv-state').hidden=false;ovlClose();setTimeout(()=>openManual(),200);toast('Forma avanzata applicata');
 };
+$('ov-adv').addEventListener('click',ev=>{if(ev.target===$('ov-adv')||ev.target.closest('[data-close]'))setTimeout(()=>openManual(),200);});
 $('adv-off').onclick=ev=>{ev.preventDefault();$('m-d').value='';$('adv-state').hidden=true;};
 
 $('m-pv').onclick=()=>{
@@ -450,7 +447,7 @@ $('mf').onsubmit=async ev=>{
     const e=manualEntry();
     if(!safeConj(e))throw new Error('Con questi dati non è possibile coniugare il verbo');
     const s=await saveUser(e,{source:'manual'});
-    $('mprev').innerHTML='';$('mf').reset();$('adv-state').hidden=true;toast('Salvato: '+s.lemma);
+    $('mprev').innerHTML='';$('mf').reset();$('adv-state').hidden=true;ovlClose();toast('Salvato: '+s.lemma);
     go('cerca');$('q').value=s.lemma;search(s.lemma);
   }catch(err){$('mprev').innerHTML=`<p class="warn">${esc(err.message)}</p>`;}
 };
@@ -488,7 +485,6 @@ function go(tab){
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
 $('q-clear').onclick=()=>{const q=$('q');q.value='';q.dispatchEvent(new Event('input',{bubbles:true}));$('out').innerHTML='';$('sugg').innerHTML='';current=null;window.scrollTo(0,0);};
-$('w-clear').onclick=()=>{const w=$('wq');w.value='';w.dispatchEvent(new Event('input',{bubbles:true}));$('prev').innerHTML='';$('mprev').innerHTML='';window.scrollTo(0,0);};
 $('f').addEventListener('submit',ev=>{ev.preventDefault();search($('q').value);});
 $('q').addEventListener('input',()=>suggest($('q').value));
 
