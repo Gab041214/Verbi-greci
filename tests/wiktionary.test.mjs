@@ -106,3 +106,10 @@ test('varianti separate da " - " (παρακολουθώ, classe B2 con forme co
   assert.equal(entry.O.impf[0],'παρακολουθούσα / παρακολούθαγα');
   assert.equal(entry.m,'παρακολουθημένος');
 });
+
+test('cleanCell: forme solo tra parentesi quadre vengono tenute, altrimenti scartate',()=>{
+  assert.equal(cleanCell('[καλούμουν]'),'καλούμουν');
+  assert.equal(cleanCell('[προσκαλούμουν(α)]'),'προσκαλούμουν(α)');
+  assert.equal(cleanCell('καλούνταν, {καλείτο}'),'καλούνταν');
+  assert.equal(cleanCell('γράφουμε, [γράφομε]'),'γράφουμε');
+});
