@@ -138,3 +138,19 @@ test('pagina di una forma flessa: rimanda al verbo',async()=>{
   const l=await lookupForm('γράφω',fake(html));
   assert.equal(l.kind,'lemma');assert.equal(l.entry.O.pres[0],'γράφω');
 });
+
+test('forma flessa: varie scritture del rimando al verbo',()=>{
+  const G='<h2 id="Greek">Greek</h2><h3 id="Verb">Verb</h3><p class="headword-line"><strong>τιμώρησα</strong></p><ol>';
+  // collegamento con title (come τίμησα)
+  assert.deepEqual(formOfLemmas(G+'<li>first-person singular simple past of <i><a href="/wiki/x" title="τιμωρώ">τιμωρώ</a></i> (timoró)</li></ol>','τιμώρησα').map(x=>x.title),['τιμωρώ']);
+  // collegamento senza title, solo testo
+  assert.deepEqual(formOfLemmas(G+'<li>first-person singular simple past of τιμωρώ (timoró)</li></ol>','τιμώρησα').map(x=>x.title),['τιμωρώ']);
+  // collegamenti grammaticali ignorati, resta il verbo
+  assert.deepEqual(formOfLemmas(G+'<li><a title="Appendix:Glossary">simple past</a> <a title="first person">first-person</a> singular of <a href="/wiki/y" title="τιμωρώ">τιμωρώ</a></li></ol>','τιμώρησα').map(x=>x.title),['τιμωρώ']);
+  // un lemma normale non è una forma
+  assert.deepEqual(formOfLemmas(G+'<li>to punish</li></ol>','τιμωρώ'),[]);
+});
+test('lookupForm senza risultati: errore con diagnostica',async()=>{
+  const fake=async()=>({ok:true,json:async()=>({parse:{text:'<h2 id="Greek">Greek</h2><p>niente</p>'}})});
+  await assert.rejects(()=>lookupForm('χχχ',fake),e=>/diag|Nessuna voce/.test(e.message)&&typeof e.diag==='string');
+});
