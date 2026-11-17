@@ -107,17 +107,18 @@ function formNote(q,h){
   const first=$('out').querySelector('.hit');
   if(first)first.scrollIntoView({block:'center',behavior:'smooth'});
 }
-function candidates(q,list,note){
-  $('out').innerHTML=`<p class="msg">«<b lang="el">${esc(q.trim())}</b>» ${note||'può essere una forma di più verbi'}:</p><div class="cands">`+
+function candidates(q,list,note,el=$('out')){
+  el.innerHTML=`<p class="msg">«<b lang="el">${esc(q.trim())}</b>» ${note||'può essere una forma di più verbi'}:</p><div class="cands">`+
     list.map(h=>`<button type="button" data-l="${esc(h.e?h.e.lemma:h.title)}" data-v="${h.voice||'act'}" data-q="${esc(q.trim())}"><span lang="el"><b>${esc(h.e?h.e.display:h.title)}</b></span><em>${esc(h.e?`${h.e.gloss} · ${h.tags.join(' · ')}`:h.desc)}</em></button>`).join('')+`</div>`;
-  $('out').querySelectorAll('.cands button').forEach(b=>b.onclick=()=>pickLemma(b.dataset.l,b.dataset.v,b.dataset.q));
+  el.querySelectorAll('.cands button').forEach(b=>b.onclick=()=>pickLemma(b.dataset.l,b.dataset.v,b.dataset.q,el));
 }
-async function pickLemma(l,voice,q){
+async function pickLemma(l,voice,q,el=$('out')){
   const hit=INDEX.get(keyOf(l));
+  if(hit&&el!==$('out')){go('cerca');$('q').value=l;search(l);return;}
   if(hit){show(hit.e,voice||hit.voice);const fh=FORMS.get(keyOf(q||''));const h=fh&&fh.find(x=>x.e===hit.e);if(h)formNote(q,h);return;}
-  $('out').innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
-  try{const {entry,report}=await importOne(l);showPreview($('out'),entry,report);}
-  catch(err){failBox($('out'),err,'Importazione non riuscita');}
+  el.innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
+  try{const {entry,report}=await importOne(l);showPreview(el,entry,report);}
+  catch(err){failBox(el,err,'Importazione non riuscita');}
 }
 async function search(q){
   const seq=++searchSeq;
@@ -340,7 +341,21 @@ $('wf').onsubmit=async ev=>{
   ev.preventDefault();
   const t=$('wq').value.trim();if(!t)return;
   $('prev').innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
-  try{const {entry,report}=await importOne(t);showPreview($('prev'),entry,report);}
+  try{
+    const res=await lookupForm(t);
+    if(res.kind==='forms'){
+      if(res.lemmas.length===1){
+        const l=res.lemmas[0].title;
+        const {entry,report}=await importOne(l);
+        showPreview($('prev'),entry,report);
+        $('prev').insertAdjacentHTML('afterbegin',`<p class="msg">«<b lang="el">${esc(t)}</b>» è una forma di <b lang="el">${esc(l)}</b>: ecco il verbo.</p>`);
+      }else candidates(t,res.lemmas,'è una forma di',$('prev'));
+      return;
+    }
+    let {entry,report}=res;
+    if(entry.fromHeadword){const r=fromHeadword(entry);entry=r.entry;report={found:[],missing:[],noTable:true,notes:r.notes};}
+    showPreview($('prev'),entry,report);
+  }
   catch(err){failBox($('prev'),err,'Importazione non riuscita');}
 };
 $('pgo').onclick=()=>{
