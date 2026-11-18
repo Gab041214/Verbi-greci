@@ -33,3 +33,12 @@ test('indice delle forme: qualsiasi forma porta al verbo',()=>{
   assert.ok(idx.get(kOf('γεννιεσαι')).length>1);                    // forma comune a più verbi
   assert.deepEqual(formVariants('έγραψαν(ε) / έγραψαν'),['έγραψαν','έγραψανε','έγραψαν']);
 });
+
+import {toJson,fromJson,bulkFromJson} from '../src/js/store.js';
+test('esportazione: lo stato delle lettere viaggia nello stesso file e non disturba i verbi',()=>{
+  const j=toJson([],{bulk:{'α':{complete:true,saved:3,problems:[],date:'18/11/2026'}}});
+  assert.equal(fromJson(j).length,0);
+  assert.equal(bulkFromJson(j)['α'].saved,3);
+  assert.equal(bulkFromJson(toJson([])),null);
+  assert.equal(bulkFromJson('[]'),null);
+});
