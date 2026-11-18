@@ -229,3 +229,8 @@ footer{display:flex;justify-content:center;padding-bottom:calc(8px + env(safe-ar
 .pvbox .row{margin-top:10px}
 .resc{margin-top:12px}
 .pop #mf{margin-top:6px}
+.clsq p{margin:0 0 4px}
+.clsg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.clsg .btn{width:100%}
+.clsx{margin-top:8px;text-align:center;color:var(--mute);font-size:.92rem;line-height:1.4}
+.clsx span{color:var(--ink)}
