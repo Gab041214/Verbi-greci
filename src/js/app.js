@@ -329,7 +329,8 @@ function reportHtml(r){
   if(!r)return '';
   if(r.noTable)return `<p class="warn">Wiktionary non ha la tabella di coniugazione per questo verbo. Le forme sono calcolate con le regole${r.notes&&r.notes.length?' ('+esc(r.notes.join('; '))+')':''}: controllale e correggile se serve.</p>`;
   const miss=(r.missing||[]);
-  return miss.length?`<p class="warn">Dati non trovati nella tabella (verranno calcolati con le regole): ${esc(miss.join(', '))}</p>`:'<p class="ok">Tabella letta completamente.</p>';
+  const rep=(r.repairs&&r.repairs.length)?`<p class="warn">Forme corrette per caratteri non greci (controllale): ${esc(r.repairs.join('; '))}</p>`:'';
+  return rep+(miss.length?`<p class="warn">Dati non trovati nella tabella (verranno calcolati con le regole): ${esc(miss.join(', '))}</p>`:'<p class="ok">Tabella letta completamente.</p>');
 }
 function rescue(el,verb){
   const v=(verb||'').trim();

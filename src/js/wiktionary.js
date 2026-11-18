@@ -2,6 +2,28 @@
    Funziona su HTML (API MediaWiki) o su testo incollato (celle separate da tab). */
 const API='https://en.wiktionary.org/w/api.php';
 const GREEK_FORM=/^[α-ωά-ώϊϋΐΰς]+(\(ε\)|\([α-ω]\))?$/i;
+
+/* ---- normalizzazione preventiva dei caratteri ---- */
+const LAT2GR={a:'α',e:'ε',i:'ι',o:'ο',u:'υ',k:'κ',t:'τ',p:'ρ',x:'χ',v:'ν'};
+let REPAIRS=[];
+/* accenti scritti come caratteri separati, µ, punto e virgola greco, trattini e apostrofi diversi; poi forma Unicode standard (anche per l'oxia del greco antico) */
+export function normGreek(s){
+  return String(s||'')
+    .replace(/([α-ωΑ-Ωά-ώ])[´΄]/g,'$1\u0301')
+    .replace(/[´΄]/g,'')
+    .replace(/\u00b5/g,'μ').replace(/\u037e/g,';').replace(/\u0387/g,',')
+    .replace(/[\u2010\u2011\u2012\u2212]/g,'-')
+    .normalize('NFC');
+}
+/* lettere latine in mezzo a una parola già greca: le riporto al greco solo se la corrispondenza grafica è sicura */
+function repairToken(t){
+  if(!/[α-ωά-ώϊϋΐΰς]/i.test(t)||!/[a-z]/i.test(t))return t;
+  let ok=true;
+  const r=t.replace(/[a-z]/gi,c=>{const g=LAT2GR[c.toLowerCase()];if(!g){ok=false;return c;}return g;});
+  if(!ok)return t;
+  REPAIRS.push(t+' → '+r);
+  return r;
+}
 const P6=['1 sg','2 sg','3 sg','1 pl','2 pl','3 pl'];
 
 const ENT={'&nbsp;':' ','&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&#39;':"'",'&apos;':"'"};
@@ -43,10 +65,10 @@ export function textToRows(text){
 /* una cella -> "forma / variante" (solo parole greche; scarta [..], (variante rara), —, "θα …") */
 function splitForms(s){
   /* note di rimando tipo «(προλαμβάνω →)»: le parentesi con spazi o frecce non fanno parte della forma; «(ε)» invece sì */
-  s=s.replace(/\s*\([^)]*[\s→➤][^)]*\)/g,'');
+  s=normGreek(s).replace(/\s*\([^)]*[\s→➤][^)]*\)/g,'');
   s=s.replace(/➤/g,'').replace(/[—–]/g,'');
   s=s.replace(/\s+-\s*|\s*-\s+/g,', ');   // «forma - variante colloquiale»
-  const toks=s.split(/\s*[,;\/]\s*/).map(t=>t.trim()).filter(Boolean)
+  const toks=s.split(/\s*[,;\/]\s*/).map(t=>t.trim()).filter(Boolean).map(repairToken)
     .filter(t=>GREEK_FORM.test(t));
   return [...new Set(toks)].join(' / ');
 }
@@ -107,7 +129,7 @@ function columnsFor(header,ncol){
 }
 
 export function rowsToEntry(rows,title){
-  const O={};const report={found:[],missing:[]};
+  const O={};const report={found:[],missing:[]};REPAIRS=[];
   let header=null,bi=0,imp=0;
   for(let i=0;i<rows.length;i++){
     const r=rows[i];
@@ -166,6 +188,7 @@ export function rowsToEntry(rows,title){
   want.forEach(k=>{if(O[k])report.found.push(k);else report.missing.push(k);});
   if(!cls.startsWith('D')&&(O.ppres||O.paor))report.found.push('passivo');
   ['ipres','iaor','ptc'].forEach(k=>{if(O[k])report.found.push(k);});
+  if(REPAIRS.length)report.repairs=[...new Set(REPAIRS)];
   return {entry,report};
 }
 
