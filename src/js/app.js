@@ -289,7 +289,7 @@ function closeGloss(instant){const d=$('gl');if(!d)return;if(instant===true){d.r
 /* ---------- archivio ---------- */
 function renderArchive(){
   const k=keyOf($('afilter').value||'');
-  const rows=LIST.filter(e=>!k||e.keys.some(f=>keyOf(f).includes(k))||keyOf(e.gloss).includes(k));
+  const rows=LIST.filter(e=>!k||e.keys.some(f=>keyOf(f).startsWith(k))||keyOf(e.gloss).split(/[^\p{L}]+/u).some(w=>w.startsWith(k)));
   const shown=rows.slice(0,300);
   $('alist').innerHTML=shown.map((e,i)=>`<div class="sw" data-i="${i}">${e._origin==='user'?'<button type="button" class="sw-del">Elimina</button>':''}<div class="item" data-l="${esc(e.lemma)}"><span><b lang="el">${esc(e.display)}</b><em>${esc(e.gloss)}</em>${glossIsEn(e)?EN_TAG:''}</span><span class="badge ${e._origin==='user'?'user':''}">${esc(e._origin==='user'?(e.edited?'corretto':SRC[e.source]||'mio'):SRC[e._origin])}</span></div></div>`).join('')+(rows.length>300?`<p class="mute">Mostrati i primi 300 di ${rows.length}: affina il filtro.</p>`:'');
   const W=96;
