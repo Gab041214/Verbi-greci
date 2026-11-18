@@ -362,45 +362,66 @@ function showPreview(el,entry,report){
     const sv=await saveUser(entry,{});const inSearch=el===$('out');el.innerHTML='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,'act');}
   };
 }
-async function importOne(title){
-  let {entry,report}=await fetchVerb(title);
-  if(entry.fromHeadword){
-    const r=fromHeadword(entry);
-    entry=r.entry;
-    report={found:[],missing:[],noTable:true,notes:r.notes};
-  }
-  return {entry,report};
-}
 $('pgo').onclick=()=>{
   const t=$('pt').value.trim(),p=$('pp').value;
   if(!t||!p.trim()){toast('Serve il verbo e la tabella incollata');return;}
   try{const {entry,report}=parsePastedText(p,t);ovlClose();go('cerca');$('q').value=entry.lemma||t;$('sugg').innerHTML='';showPreview($('out'),entry,report);window.scrollTo(0,0);}
   catch(err){ovlClose();go('cerca');failBox($('out'),err,'Tabella non letta',t);}
 };
+const PROB=[];
 let stopBulk=false,bulkCont=null;
+const BK='vg-bulk';
+const bulkState=()=>{try{return JSON.parse(localStorage.getItem(BK)||'{}')||{};}catch(_){return {};}};
+const bulkStore=o=>{try{localStorage.setItem(BK,JSON.stringify(o));}catch(_){}};
+function bulkMarks(){
+  const st=bulkState();
+  [...$('bletter').options].forEach(o=>{const l=o.dataset.l||(o.dataset.l=o.value);if(!l)return;const x=st[l];o.textContent=l+(x?(x.complete?' ✓':' …'):'');});
+  const L=$('bletter').value,x=st[L];
+  $('binfo').hidden=!L;
+  $('binfo').textContent=!L?'':x?(x.complete?'Completata':'Iniziata, non completata')+' il '+x.date+' · salvati '+x.saved+' · saltati con problemi '+(x.problems||[]).length:'Lettera non ancora importata.';
+}
+$('bletter').onchange=()=>{bulkCont=null;const x=bulkState()[$('bletter').value];PROB.length=0;if(x)PROB.push(...(x.problems||[]));bulkProblems();bulkMarks();};
+setTimeout(bulkMarks,0);
+const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
+function bulkProblems(){
+  $('bprob').hidden=!PROB.length;
+  $('bprob-list').textContent=PROB.map(p=>p.t+' — '+p.why).join('\n');
+}
 $('bulk').onclick=async()=>{
   stopBulk=false;$('bulk').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
-  let done=0,skipped=0,fail=0;
+  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;}bulkProblems();
   try{
     do{
-      const {titles,next}=await listVerbs(bulkCont);
+      const L=$('bletter').value;
+      let {titles,next}=await listVerbs(bulkCont);
       bulkCont=next;
+      if(L)titles=titles.filter(t=>keyOf(t).startsWith(L));
       $('bprog').max=Math.max(titles.length,1);
       let i=0;
       for(const t of titles){
         if(stopBulk)break;
         i++;$('bprog').value=i;
-        if(BYID.has(keyOf(t))&&BYID.get(keyOf(t))._origin!=='base'){skipped++;continue;}
         if(BYID.has(keyOf(t))){skipped++;continue;}
-        try{const {entry}=await importOne(t);await saveUser(entry,{});done++;}catch(_){fail++;}
-        $('blog').textContent=`Importati ${done} · saltati ${skipped} · errori ${fail} — ultimo: ${t}`;
+        try{
+          /* in blocco nessuno controlla le forme: si salvano solo verbi con la tabella letta per intero */
+          const {entry,report}=await fetchVerb(t);
+          const why=entry.fromHeadword?'pagina senza tabella di coniugazione'
+            :(report.missing&&report.missing.length)?'tabella incompleta ('+report.missing.join(', ')+')'
+            :(report.repairs&&report.repairs.length)?'forme con caratteri non greci ('+report.repairs.join('; ')+')':'';
+          if(why){PROB.push({t,why});bulkProblems();}
+          else{await saveUser(entry,{});done++;}
+        }catch(err){PROB.push({t,why:'non letta: '+(err&&err.message||'errore')});bulkProblems();}
+        bulkLog(done,skipped,t);
         await new Promise(r=>setTimeout(r,150));
       }
     }while(bulkCont&&!stopBulk);
   }catch(err){$('blog').textContent='Interrotto: '+err.message;}
   $('bulk').disabled=false;$('bulkstop').disabled=true;
+  if(L0){const st=bulkState(),old=st[L0]||{saved:0};st[L0]={complete:!bulkCont&&!stopBulk,saved:(old.saved||0)+done,problems:PROB.map(p=>({...p})),date:new Date().toLocaleDateString('it-IT')};bulkStore(st);bulkMarks();}
+  bulkLog(done,skipped);
   $('blog').textContent+=bulkCont?' (ripresa possibile)':' — fine elenco';
 };
+$('bcopy').onclick=async()=>{const t=PROB.map(p=>p.t+' — '+p.why).join('\n');try{await navigator.clipboard.writeText(t);toast('Elenco copiato');}catch(_){const r=document.createRange();r.selectNodeContents($('bprob-list'));const s2=getSelection();s2.removeAllRanges();s2.addRange(r);toast('Seleziona e copia');}};
 $('bulkstop').onclick=()=>{stopBulk=true;};
 
 /* ---------- inserimento manuale ---------- */
@@ -470,15 +491,19 @@ $('mf').onsubmit=async ev=>{
 
 /* ---------- esporta / importa ---------- */
 $('exp').onclick=()=>{
-  if(!USER.length){toast('Non hai ancora dati tuoi da esportare');return;}
-  download('extra.json',store.toJson(USER));
+  const bk=bulkState();
+  if(!USER.length&&!Object.keys(bk).length){toast('Non hai ancora dati tuoi da esportare');return;}
+  download('extra.json',store.toJson(USER,Object.keys(bk).length?{bulk:bk}:null));
 };
 $('imp').onchange=async ev=>{
   const f=ev.target.files[0];if(!f)return;
   try{
-    const arr=store.fromJson(await f.text());
+    const txt=await f.text();
+    const arr=store.fromJson(txt);
     for(const r of arr)await store.put(hydrate(r));
-    USER=(await store.getAll()).map(hydrate);rebuild();renderArchive();toast('Importati '+arr.length+' verbi');
+    const ib=store.bulkFromJson(txt);let nl=0;
+    if(ib){const st=bulkState();for(const [l,x] of Object.entries(ib)){const o=st[l];if(!o||(x.complete&&!o.complete)){st[l]=x;nl++;}}bulkStore(st);bulkMarks();}
+    USER=(await store.getAll()).map(hydrate);rebuild();renderArchive();toast('Importati '+arr.length+' verbi'+(nl?' e lo stato di '+nl+' lettere':''));
   }catch(err){toast('File non valido: '+err.message);}
   ev.target.value='';
 };

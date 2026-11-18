@@ -33,8 +33,12 @@ export async function clearAll(){
   if(!db){mem.clear();return;}
   await req(db.transaction(ST,'readwrite').objectStore(ST).clear());
 }
-export function toJson(entries){
-  return JSON.stringify({version:1,exported:new Date().toISOString().slice(0,10),entries:entries.map(serializeEntry)},null,1);
+export function toJson(entries,extra){
+  return JSON.stringify({version:1,exported:new Date().toISOString().slice(0,10),entries:entries.map(serializeEntry),...(extra||{})},null,1);
+}
+/* stato dell'importazione di massa (lettere già importate), se presente nel file */
+export function bulkFromJson(text){
+  try{const j=JSON.parse(text);return j&&!Array.isArray(j)&&j.bulk&&typeof j.bulk==='object'?j.bulk:null;}catch(_){return null;}
 }
 export function fromJson(text){
   const j=JSON.parse(text);
