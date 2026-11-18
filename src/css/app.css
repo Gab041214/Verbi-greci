@@ -234,3 +234,8 @@ footer{display:flex;justify-content:center;padding-bottom:calc(8px + env(safe-ar
 .clsg .btn{width:100%}
 .clsx{margin-top:8px;text-align:center;color:var(--mute);font-size:.92rem;line-height:1.4}
 .clsx span{color:var(--ink)}
+
+.bprob{max-height:180px;overflow:auto;white-space:pre-wrap;font:inherit;font-size:.85rem;color:var(--mute);margin:6px 0 10px}
+#bprob{margin-top:10px}
+.lbl{display:flex;flex-direction:column;gap:4px;font-size:.88rem;color:var(--mute);margin:10px 0}
+.lbl select{width:100%}
