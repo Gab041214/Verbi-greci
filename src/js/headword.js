@@ -1,9 +1,9 @@
 /* Verbo senza tabella su Wiktionary: forme calcolate con le regole, correggendo aoristo e participio
    con quanto scritto nella riga del lemma (past / ppp). */
 import {guessEntry,conjugate,strip,finalizeEntry} from './engine.js';
-export function fromHeadword(entry){
+export function fromHeadword(entry,cls){
   const h=entry.fromHeadword||{};
-  const g=guessEntry(entry.forms[0]);
+  const g=guessEntry(entry.forms[0],cls);
   if(!g)throw new Error('Non riconosco la desinenza del verbo');
   const e={...g,gloss:entry.gloss||'',gloss_en:entry.gloss_en,source:'wiktionary',updated:entry.updated,O:{}};
   delete e.guessed;

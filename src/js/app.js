@@ -113,11 +113,22 @@ function candidates(q,list,note,el=$('out')){
     list.map(h=>`<button type="button" data-l="${esc(h.e?h.e.lemma:h.title)}" data-v="${h.voice||'act'}" data-q="${esc(q.trim())}"><span lang="el"><b>${esc(h.e?h.e.display:h.title)}</b></span><em>${esc(h.e?`${h.e.gloss} · ${h.tags.join(' · ')}`:h.desc)}</em></button>`).join('')+`</div>`;
   el.querySelectorAll('.cands button').forEach(b=>b.onclick=()=>pickLemma(b.dataset.l,b.dataset.v,b.dataset.q,el));
 }
+/* verbo in -ώ senza tabella: la classe (B1 αγαπώ / B2 θεωρώ) non si può dedurre, la chiedo */
+const needsClass=l=>{const t=String(l||'').trim().toLowerCase();return /ώ$/.test(t)&&!/ποιώ$/.test(t);};
+function askClass(el,lemma,onPick,why){
+  const f=c=>{try{const g=guessEntry(lemma,c);const v=conjugate(g).find(x=>x.id==='act');return v.cards.ind[0].forms[1];}catch(_){return '';}};
+  el.innerHTML=`<div class="box clsq"><p><b lang="el">${esc(lemma)}</b> è un verbo in -ώ e ${esc(why||'su Wiktionary non ho trovato la tabella di coniugazione')}. Di quale classe è?</p><div class="clsg"><div><button type="button" class="btn" data-c="B1">B1</button><div class="clsx">come <span lang="el">αγαπώ</span><br><span lang="el">${esc(f('B1'))}</span></div></div><div><button type="button" class="btn" data-c="B2">B2</button><div class="clsx">come <span lang="el">θεωρώ</span><br><span lang="el">${esc(f('B2'))}</span></div></div></div></div>`;
+  el.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>onPick(b.dataset.c));
+}
+function resolveHeadword(el,entry){
+  const done=cls=>{const r=fromHeadword(entry,cls);showPreview(el,r.entry,{found:[],missing:[],noTable:true,notes:r.notes});};
+  if(needsClass(entry.forms[0]))askClass(el,entry.forms[0],done,'la pagina non ha la tabella di coniugazione');else done();
+}
 async function pickLemma(l,voice,q,el=$('out')){
   const hit=INDEX.get(keyOf(l));
   if(hit){show(hit.e,voice||hit.voice);const fh=FORMS.get(keyOf(q||''));const h=fh&&fh.find(x=>x.e===hit.e);if(h)formNote(q,h);return;}
   el.innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
-  try{const {entry,report}=await importOne(l);showPreview(el,entry,report);}
+  try{const {entry,report}=await fetchVerb(l);if(entry.fromHeadword)resolveHeadword(el,entry);else showPreview(el,entry,report);}
   catch(err){failBox(el,err,'Importazione non riuscita',l);}
 }
 async function search(q){
@@ -137,8 +148,12 @@ async function search(q){
   if(res&&res.kind==='forms'){candidates(q,res.lemmas,'è una forma di');return;}
   if(res&&res.kind==='lemma'){
     let {entry,report}=res;
-    if(entry.fromHeadword){const r=fromHeadword(entry);entry=r.entry;report={found:[],missing:[],noTable:true,notes:r.notes};}
+    if(entry.fromHeadword){resolveHeadword($('out'),entry);return;}
     showPreview($('out'),entry,report);return;
+  }
+  if(needsClass(q)&&guessEntry(q)){
+    if(lerr&&lerr.diag){failBox($('out'),lerr,'Pagina trovata ma non letta',q);return;}
+    askClass($('out'),q.trim(),c=>{const g2=guessEntry(q,c);g2._origin='guess';show(g2,'act');});return;
   }
   const g=guessEntry(q);
   if(g){g._origin='guess';show(g,'act');return;}

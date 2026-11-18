@@ -402,7 +402,7 @@ function guessPassive(a){
   if(/σ$/.test(a))return a+'τ';
   return a+'θ';
 }
-function guessEntry(raw){
+function guessEntry(raw,forceCls){
   let t=raw.trim().toLowerCase();
   if(!t||/[^α-ωά-ώϊϋΐΰς]/.test(t))return null;
   let cls=null;
@@ -410,9 +410,11 @@ function guessEntry(raw){
   else if(/ούμαι$/.test(t))cls='DB2';
   else if(/άμαι$/.test(t))cls='DA';
   else if(/ομαι$/.test(t))cls='D';
+  else if(/ποιώ$/.test(t))cls='B2';
   else if(/(άω|ώ)$/.test(t))cls='B1';
   else if(/ω$/.test(t))cls='A';
   if(!cls)return null;
+  if(forceCls)cls=forceCls;
   if(!/[άέήίόύώΐΰ]/.test(t)){
     if(cls==='A')t=stressEnd(t,2);
     else if(cls==='D')t=stressEnd(t,3);
