@@ -314,3 +314,9 @@ export async function listVerbs(cont,f=fetch,limit=200){
   const titles=j.query.categorymembers.map(x=>x.title).filter(t=>/^[α-ωά-ώϊϋΐΰς]+$/i.test(t)&&/(ω|ώ|ομαι|άμαι|ιέμαι|ούμαι)$/.test(t));
   return {titles,next:j.continue&&j.continue.cmcontinue||null};
 }
+
+/* testo diagnostico di un verbo (anche se letto bene o senza tabella): da inviare allo sviluppatore */
+export async function fetchDiag(title,f=fetch){
+  const j=await api({action:'parse',page:title,prop:'text',redirects:'1'},f);
+  return diagnose(j.parse.text,title);
+}

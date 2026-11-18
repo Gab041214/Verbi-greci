@@ -1,7 +1,7 @@
 import {loadLexicon,finalizeEntry,parseDslLine,entryToDsl,buildIndex,buildFormIndex,formVariants,conjugate,guessEntry,keyOf,overrideKey,CLASS_DESC} from './engine.js';
 import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
-import {fetchVerb,lookupForm,listVerbs,parsePastedText} from './wiktionary.js';
+import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktionary.js';
 import {fromHeadword} from './headword.js';
 import {initClearable} from './clearable.js';
 
@@ -420,6 +420,28 @@ $('bulk').onclick=async()=>{
   if(L0){const st=bulkState(),old=st[L0]||{saved:0};st[L0]={complete:!bulkCont&&!stopBulk,saved:(old.saved||0)+done,problems:PROB.map(p=>({...p})),date:new Date().toLocaleDateString('it-IT')};bulkStore(st);bulkMarks();}
   bulkLog(done,skipped);
   $('blog').textContent+=bulkCont?' (ripresa possibile)':' — fine elenco';
+};
+/* campione di verbi saltati: per ogni tipo di problema, uno non in -ομαι e uno in -ομαι (o i primi due) */
+function bulkSample(){
+  const by={};
+  PROB.forEach(p=>{const k=p.why.split(' (')[0].replace(/:.*/,'');(by[k]=by[k]||[]).push(p);});
+  const out=[];
+  Object.values(by).forEach(list=>{
+    const pass=list.find(p=>/(ομαι)$/.test(p.t)),act=list.find(p=>!/(ομαι)$/.test(p.t));
+    const pick=[act,pass].filter(Boolean);
+    if(pick.length<2)list.forEach(p=>{if(pick.length<2&&!pick.includes(p))pick.push(p);});
+    out.push(...pick);
+  });
+  return out.slice(0,6);
+}
+$('bdiag').onclick=async()=>{
+  const s=bulkSample();if(!s.length)return;
+  $('bdiag').disabled=true;$('bdiag').textContent='Scarico…';
+  const parts=[];
+  for(const p of s){try{parts.push('=== '+p.t+' — '+p.why+'\n'+await fetchDiag(p.t));}catch(err){parts.push('=== '+p.t+' — dettagli non scaricati: '+err.message);}await new Promise(r=>setTimeout(r,150));}
+  const t=parts.join('\n\n');
+  try{await navigator.clipboard.writeText(t);toast('Dettagli copiati ('+s.length+' verbi)');}catch(_){$('bprob-list').textContent=t;toast('Seleziona e copia');}
+  $('bdiag').disabled=false;$('bdiag').textContent='Copia dettagli di alcuni verbi';
 };
 $('bcopy').onclick=async()=>{const t=PROB.map(p=>p.t+' — '+p.why).join('\n');try{await navigator.clipboard.writeText(t);toast('Elenco copiato');}catch(_){const r=document.createRange();r.selectNodeContents($('bprob-list'));const s2=getSelection();s2.removeAllRanges();s2.addRange(r);toast('Seleziona e copia');}};
 $('bulkstop').onclick=()=>{stopBulk=true;};
