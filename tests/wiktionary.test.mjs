@@ -154,3 +154,29 @@ test('lookupForm senza risultati: errore con diagnostica',async()=>{
   const fake=async()=>({ok:true,json:async()=>({parse:{text:'<h2 id="Greek">Greek</h2><p>niente</p>'}})});
   await assert.rejects(()=>lookupForm('χχχ',fake),e=>/diag|Nessuna voce/.test(e.message)&&typeof e.diag==='string');
 });
+
+/* ---- normalizzazione preventiva dei caratteri ---- */
+import {normGreek} from '../src/js/wiktionary.js';
+test('normGreek: oxia, accento separato, µ, ;, trattini',()=>{
+  assert.equal(normGreek('γράφω'),'γράφω');
+  assert.equal(normGreek('γρα´φω'),'γράφω');
+  assert.equal(normGreek('µε'),'με');
+  assert.equal(normGreek('a;b'),'a;b');
+  assert.equal(normGreek('a − b'),'a - b');
+});
+test('cleanCell: forme con varianti Unicode e lettere latine in parole greche',()=>{
+  assert.equal(cleanCell('γράφω; γράφεις'),'γράφω / γράφεις');
+  assert.equal(cleanCell('γράφoυν(ε)'),'γράφουν(ε)');
+  assert.equal(cleanCell('γράφω − γράφεις'),'γράφω / γράφεις');
+});
+test('cleanCell: traslitterazioni latine e parole con lettere ambigue restano scartate',()=>{
+  assert.equal(cleanCell('grafo'),'');
+  assert.equal(cleanCell('γράφn'),'');
+  assert.equal(cleanCell('γράφω, grafo, γράφεις'),'γράφω / γράφεις');
+});
+test('rowsToEntry segnala le forme corrette per caratteri latini',()=>{
+  const P=['εγώ','εσύ','αυτός','εμείς','εσείς','αυτοί'];
+  const rows=[['Active','Active'],...P.map((p,i)=>[p,['γράφω','γράφεις','γράφει','γράφουμε','γράφετε','γράφουν(ε)'][i].replace('ω','ω').replace('ε','e')])];
+  const {report}=rowsToEntry(rows,'γράφω');
+  assert.ok(report.repairs&&report.repairs.length>0);
+});
