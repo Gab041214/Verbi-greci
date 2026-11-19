@@ -213,3 +213,27 @@ test('riga del lemma con due forme di aoristo: past, pasts',()=>{
   assert.equal(entry.fromHeadword.past,'ξαναείδα');
   assert.deepEqual(entry.fromHeadword.pasts,['ξαναείδα','ξανάδα']);
 });
+
+test('verbo difettivo solo passivo (ωρύομαι): presente e imperfetto, futuro ignorato, tempi assenti nascosti',()=>{
+  const rows=[
+    ['','Passive voice ➤ — Imperfective aspect ➤'],
+    ['Indicative mood ➤','Present ➤','Imperfect ➤','Future ➤'],
+    ['1 sg','ωρύομαι','ωρυόμουν(α)','θα ωρύομαι'],
+    ['2 sg','ωρύεσαι','ωρυόσουν(α)','θα ωρύεσαι'],
+    ['3 sg','ωρύεται','ωρυόταν(ε)','θα ωρύεται'],
+    [''],
+    ['1 pl','ωρυόμαστε','ωρυόμασταν, (ωρυόμαστε)','θα ωρυόμαστε'],
+    ['2 pl','ωρύεστε, ωρυόσαστε','ωρυόσασταν, (ωρυόσαστε)','θα ωρύεστε, θα ωρυόσαστε'],
+    ['3 pl','ωρύονται','ωρύονταν, (ωρυόντουσαν)','θα ωρύονται'],
+    ['Other forms ➤','Present participle ➤','Perfect participle ➤'],
+    ['','ωρυόμενος, ‑η, ‑ο ➤','—'],
+  ];
+  const {entry,report}=rowsToEntry(rows,'ωρύομαι');
+  assert.equal(entry.cls,'D');
+  assert.equal(entry.O.ppres[0],'ωρύομαι');
+  assert.equal(entry.O.pimpf[2],'ωρυόταν(ε)');
+  assert.deepEqual(report.missing,[]);
+  const v=conjugate(finalizeEntry(entry)).find(x=>x.id==='pass');
+  assert.ok(v);
+  assert.ok(!v.cards.ind.some(c=>c.id==='aor'));
+});
