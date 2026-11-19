@@ -136,7 +136,15 @@ async function tryDerive(title,wik,web=true){
   if(wik&&wik.gloss){d.gloss=wik.gloss;if(wik.gloss_en)d.gloss_en=wik.gloss_en;}
   else if(base.gloss){const en=glossIsEn(base);d.gloss=base.gloss+(en?' again':' di nuovo');if(en)d.gloss_en=d.gloss;}
   d.keys=[...new Set([...d.keys])];
-  return {entry:d,report:{found:[],missing:[],derived:{from:base.lemma,prefix:sp.prefix,noPass:/ομαι$/.test(title)&&!d.O.ppres&&!d.cls.startsWith('D')}}};
+  /* forme alternative dell'aoristo scritte nella riga del verbo (es. ξαναείδα/ξανάδα) */
+  const extra=[];
+  const hp=wik&&wik.fromHeadword&&wik.fromHeadword.pasts;
+  if(hp&&hp.length&&Array.isArray(d.O.aor)&&d.O.aor.length){
+    const have=d.O.aor[0].split(' / ');
+    hp.forEach(p=>{if(!have.includes(p)){have.push(p);extra.push(p);}});
+    if(extra.length)d.O.aor=[have.join(' / '),...d.O.aor.slice(1)];
+  }
+  return {entry:d,report:{found:[],missing:[],derived:{extra,from:base.lemma,prefix:sp.prefix,noPass:/ομαι$/.test(title)&&!d.O.ppres&&!d.cls.startsWith('D')}}};
 }
 async function resolveHeadword(el,entry){
   const dv=await tryDerive(entry.forms[0],entry);
@@ -350,7 +358,7 @@ function download(name,text){
 /* ---------- importazione da Wiktionary ---------- */
 function reportHtml(r){
   if(!r)return '';
-  if(r.derived)return `<p class="warn">Wiktionary non ha la tabella di questo verbo. Le forme sono ottenute da «${esc(r.derived.from)}» aggiungendo «${esc(r.derived.prefix)}-» a ogni forma (nelle forme di una sola sillaba l'accento è aggiunto): controllale.${r.derived.noPass?' Le forme passive del verbo base non sono nell\'archivio, quindi mancano anche qui.':''}</p>`;
+  if(r.derived)return `<p class="warn">Wiktionary non ha la tabella di questo verbo. Le forme sono ottenute da «${esc(r.derived.from)}» aggiungendo «${esc(r.derived.prefix)}-» a ogni forma (nelle forme di una sola sillaba l'accento è aggiunto): controllale.${r.derived.extra&&r.derived.extra.length?' Alla prima persona dell\'aoristo ho aggiunto '+r.derived.extra.map(esc).join(', ')+', scritta nella riga del verbo su Wiktionary.':''}${r.derived.noPass?' Le forme passive del verbo base non sono nell\'archivio, quindi mancano anche qui.':''}</p>`;
   if(r.noTable)return `<p class="warn">Wiktionary non ha la tabella di coniugazione per questo verbo. Le forme sono calcolate con le regole${r.notes&&r.notes.length?' ('+esc(r.notes.join('; '))+')':''}: controllale e correggile se serve.</p>`;
   const miss=(r.missing||[]);
   const rd=r.redirect?`<p class="ok">«${esc(r.redirect.from)}» rimanda a «${esc(r.redirect.to)}»: ecco la coniugazione di ${esc(r.redirect.to)}.</p>`:'';
@@ -481,7 +489,7 @@ $('bdiag').onclick=async()=>{
   try{await navigator.clipboard.writeText(t);toast('Dettagli copiati ('+s.length+' verbi)');}catch(_){$('bprob-list').textContent=t;toast('Seleziona e copia');}
   $('bdiag').disabled=false;$('bdiag').textContent='Copia dettagli di alcuni verbi';
 };
-$('bcopy').onclick=async()=>{const t=PROB.map(p=>p.t+' — '+p.why).join('\n');try{await navigator.clipboard.writeText(t);toast('Elenco copiato');}catch(_){const r=document.createRange();r.selectNodeContents($('bprob-list'));const s2=getSelection();s2.removeAllRanges();s2.addRange(r);toast('Seleziona e copia');}};
+$('bcopy').onclick=async()=>{const t=PROB.map(p=>p.t+'\t'+String(p.why).replace(/[\t\r\n]+/g,' ')).join('\n');try{await navigator.clipboard.writeText(t);toast('Elenco copiato');}catch(_){const r=document.createRange();r.selectNodeContents($('bprob-list'));const s2=getSelection();s2.removeAllRanges();s2.addRange(r);toast('Seleziona e copia');}};
 $('bulkstop').onclick=()=>{stopBulk=true;};
 
 /* ---------- inserimento manuale ---------- */

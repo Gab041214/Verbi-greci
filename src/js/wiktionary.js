@@ -232,8 +232,9 @@ export function headwordInfo(sec){
   if(i<0)return null;
   const t=htmlText(sec.slice(i,i+1500));
   const g=re=>{const m=t.match(re);return m?m[1]:'';};
-  const past=g(/(?:simple past|past)\s+([α-ωά-ώ]+)/),ppp=g(/ppp\s+([α-ωά-ώ]+)/),passive=g(/passive\s+([α-ωά-ώ]+)/);
-  return past||ppp?{past,ppp,passive}:null;
+  const pastAll=g(/(?:simple past|past)\s+([α-ωά-ώ]+(?:\s*\/\s*[α-ωά-ώ]+)*)/),ppp=g(/ppp\s+([α-ωά-ώ]+)/),passive=g(/passive\s+([α-ωά-ώ]+)/);
+  const pasts=pastAll?pastAll.split(/\s*\/\s*/):[],past=pasts[0]||'';
+  return past||ppp?{past,pasts,ppp,passive}:null;
 }
 function parseGreekVerbHtml0(html,title){
   const sec=greekSection(html);
