@@ -206,3 +206,10 @@ test('pagina con «needs an inflection-table template»: verbo senza tabella, no
   assert.ok(entry.fromHeadword);
   assert.equal(entry.gloss_en,'to unscrew');
 });
+
+test('riga del lemma con due forme di aoristo: past, pasts',()=>{
+  const page='<h2 id="Greek">Greek</h2><h3 id="Verb">Verb</h3><p><span class="headword-line"><strong class="Grek headword">ξαναβλέπω</strong> • (<i>xanavlépo</i>) (<i>past</i> <b>ξαναείδα</b>/<b>ξανάδα</b>, <i>passive</i> <b>ξαναβλέπομαι</b>)</span></p><ol><li>to see again</li></ol><h4 id="Conjugation">Conjugation</h4><p>This verb needs an inflection-table template.</p>';
+  const {entry}=parseGreekVerbHtml(page,'ξαναβλέπω');
+  assert.equal(entry.fromHeadword.past,'ξαναείδα');
+  assert.deepEqual(entry.fromHeadword.pasts,['ξαναείδα','ξανάδα']);
+});
