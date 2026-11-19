@@ -239,7 +239,9 @@ function parseGreekVerbHtml0(html,title){
   const sec=greekSection(html);
   if(!sec)throw new Error('Nessuna sezione «Greek» nella pagina di '+title);
   if(!/<table/i.test(sec)){
-    const h=headwordInfo(sec);
+    let h=headwordInfo(sec);
+    /* Wiktionary segnala esplicitamente che manca la tabella: il verbo esiste, la coniugazione no */
+    if(!h&&/needs an inflection-table template/i.test(htmlText(sec)))h={};
     if(h){
       const entry={forms:[title],cls:null,gloss:'',O:{},source:'wiktionary',updated:new Date().toISOString().slice(0,10),fromHeadword:h};
       const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}

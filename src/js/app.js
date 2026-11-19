@@ -3,6 +3,7 @@ import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
 import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktionary.js';
 import {fromHeadword} from './headword.js';
+import {splitPrefix,deriveEntry} from './derive.js';
 import {initClearable} from './clearable.js';
 
 const $=id=>document.getElementById(id);
@@ -12,7 +13,7 @@ const GROUPS=[['ind','Indicativo','Οριστική'],['sub','Congiuntivo (με 
 const cell=f=>String(f).split(' / ').map(x=>'<span lang="el">'+esc(x)+'</span>').join('<br>');
 const glossIsEn=e=>!!e.gloss_en&&e.gloss===e.gloss_en;
 const EN_TAG=' <span class="tag warn" title="Significato in inglese: correggilo in italiano">EN</span>';
-const SRC={base:'Lessico',extra:'Repository',wiktionary:'Wiktionary',manual:'Manuale',user:'Mio'};
+const SRC={base:'Lessico',extra:'Repository',wiktionary:'Wiktionary',manual:'Manuale',derived:'Derivato',user:'Mio'};
 
 let BASE=[],EXTRA=[],USER=[],LIST=[],INDEX=new Map(),FORMS=new Map(),BYID=new Map();
 let current=null;
@@ -120,7 +121,26 @@ function askClass(el,lemma,onPick,why){
   el.innerHTML=`<div class="box clsq"><p><b lang="el">${esc(lemma)}</b> è un verbo in -ώ e ${esc(why||'su Wiktionary non ho trovato la tabella di coniugazione')}. Di quale classe è?</p><div class="clsg"><div><button type="button" class="btn" data-c="B1">B1</button><div class="clsx">come <span lang="el">αγαπώ</span><br><span lang="el">${esc(f('B1'))}</span></div></div><div><button type="button" class="btn" data-c="B2">B2</button><div class="clsx">come <span lang="el">θεωρώ</span><br><span lang="el">${esc(f('B2'))}</span></div></div></div></div>`;
   el.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>onPick(b.dataset.c));
 }
-function resolveHeadword(el,entry){
+/* verbo con prefisso (ξανα-) senza tabella: lo ricavo dal verbo base che conosco già (archivio, oppure tabella completa su Wiktionary) */
+async function tryDerive(title,wik,web=true){
+  const sp=splitPrefix(title);if(!sp)return null;
+  let base=null;
+  const h=INDEX.get(keyOf(sp.rest));
+  if(h)base=h.e;
+  else if(/ομαι$/.test(sp.rest)){const h2=INDEX.get(keyOf(sp.rest.replace(/ομαι$/,'ω')));if(h2)base=h2.e;}
+  if(!base&&web){
+    try{const r=await fetchVerb(sp.rest);const ok=!r.entry.fromHeadword&&!(r.report.missing&&r.report.missing.length)&&!(r.report.repairs&&r.report.repairs.length);if(ok)base=finalizeEntry(r.entry);}catch(_){}
+  }
+  if(!base)return null;
+  const d=deriveEntry(base,sp.prefix);if(!d)return null;
+  if(wik&&wik.gloss){d.gloss=wik.gloss;if(wik.gloss_en)d.gloss_en=wik.gloss_en;}
+  else if(base.gloss){const en=glossIsEn(base);d.gloss=base.gloss+(en?' again':' di nuovo');if(en)d.gloss_en=d.gloss;}
+  d.keys=[...new Set([...d.keys])];
+  return {entry:d,report:{found:[],missing:[],derived:{from:base.lemma,prefix:sp.prefix,noPass:/ομαι$/.test(title)&&!d.O.ppres&&!d.cls.startsWith('D')}}};
+}
+async function resolveHeadword(el,entry){
+  const dv=await tryDerive(entry.forms[0],entry);
+  if(dv){showPreview(el,dv.entry,dv.report);return;}
   const done=cls=>{const r=fromHeadword(entry,cls);showPreview(el,r.entry,{found:[],missing:[],noTable:true,notes:r.notes});};
   if(needsClass(entry.forms[0]))askClass(el,entry.forms[0],done,'la pagina non ha la tabella di coniugazione');else done();
 }
@@ -151,6 +171,9 @@ async function search(q){
     if(entry.fromHeadword){resolveHeadword($('out'),entry);return;}
     showPreview($('out'),entry,report);return;
   }
+  const dv=await tryDerive(q.trim(),null);
+  if(seq!==searchSeq)return;
+  if(dv){showPreview($('out'),dv.entry,dv.report);return;}
   if(needsClass(q)&&guessEntry(q)){
     if(lerr&&lerr.diag){failBox($('out'),lerr,'Pagina trovata ma non letta',q);return;}
     askClass($('out'),q.trim(),c=>{const g2=guessEntry(q,c);g2._origin='guess';show(g2,'act');});return;
@@ -327,6 +350,7 @@ function download(name,text){
 /* ---------- importazione da Wiktionary ---------- */
 function reportHtml(r){
   if(!r)return '';
+  if(r.derived)return `<p class="warn">Wiktionary non ha la tabella di questo verbo. Le forme sono ottenute da «${esc(r.derived.from)}» aggiungendo «${esc(r.derived.prefix)}-» a ogni forma (nelle forme di una sola sillaba l'accento è aggiunto): controllale.${r.derived.noPass?' Le forme passive del verbo base non sono nell\'archivio, quindi mancano anche qui.':''}</p>`;
   if(r.noTable)return `<p class="warn">Wiktionary non ha la tabella di coniugazione per questo verbo. Le forme sono calcolate con le regole${r.notes&&r.notes.length?' ('+esc(r.notes.join('; '))+')':''}: controllale e correggile se serve.</p>`;
   const miss=(r.missing||[]);
   const rd=r.redirect?`<p class="ok">«${esc(r.redirect.from)}» rimanda a «${esc(r.redirect.to)}»: ecco la coniugazione di ${esc(r.redirect.to)}.</p>`:'';
@@ -353,7 +377,7 @@ function failBox(el,err,intro,verb){
 function showPreview(el,entry,report){
   entry._origin='preview';
   const gl=esc(entry.gloss||'');
-  el.innerHTML='<div class="box pvbox fix"><div class="pvhead">Anteprima da Wiktionary · non ancora salvato</div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(in inglese: sostituiscilo con la traduzione)</em>':'')+'<input class="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri pv-s">Salva nell\'archivio</button><button type="button" class="btn pv-x">Scarta</button></div></div>'+reportHtml(report)+'<div class="pv-card"></div>';
+  el.innerHTML='<div class="box pvbox fix"><div class="pvhead">'+(report&&report.derived?'Anteprima ricavata da '+esc(report.derived.from)+' · non ancora salvata':'Anteprima da Wiktionary · non ancora salvato')+'</div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(in inglese: sostituiscilo con la traduzione)</em>':'')+'<input class="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri pv-s">Salva nell\'archivio</button><button type="button" class="btn pv-x">Scarta</button></div></div>'+reportHtml(report)+'<div class="pv-card"></div>';
   const q=sel=>el.querySelector(sel);
   renderEntry(q('.pv-card'),entry,'act');
   q('.pv-x').onclick=()=>{el.innerHTML='';};
@@ -383,15 +407,15 @@ function bulkMarks(){
 }
 $('bletter').onchange=()=>{bulkCont=null;const x=bulkState()[$('bletter').value];PROB.length=0;if(x)PROB.push(...(x.problems||[]));bulkProblems();bulkMarks();};
 setTimeout(bulkMarks,0);
-let ALT=0;
-const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · forme alternative ${ALT} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
+let ALT=0,DER=0;
+const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · forme alternative ${ALT} · derivati ${DER} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
 function bulkProblems(){
   $('bprob').hidden=!PROB.length;
   $('bprob-list').textContent=PROB.map(p=>p.t+' — '+p.why).join('\n');
 }
 $('bulk').onclick=async()=>{
   stopBulk=false;$('bulk').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
-  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;}bulkProblems();
+  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;DER=0;}bulkProblems();
   try{
     do{
       const L=$('bletter').value;
@@ -406,8 +430,19 @@ $('bulk').onclick=async()=>{
         if(BYID.has(keyOf(t))){skipped++;continue;}
         try{
           /* in blocco nessuno controlla le forme: si salvano solo verbi con la tabella letta per intero */
-          const {entry,report}=await fetchVerb(t);
-          if(report.redirect){ALT++;bulkLog(done,skipped,t);continue;}
+          let fv=null,ferr=null;
+          try{fv=await fetchVerb(t);}catch(err){ferr=err;}
+          if(fv&&fv.report.redirect){ALT++;bulkLog(done,skipped,t);continue;}
+          if(!fv||fv.entry.fromHeadword){
+            const dv=await tryDerive(t,fv&&fv.entry,false);
+            if(dv){
+              if(BYID.has(keyOf(dv.entry.forms[0]))){skipped++;}
+              else{await saveUser(dv.entry,{});DER++;}
+              bulkLog(done,skipped,t);continue;
+            }
+            if(ferr)throw ferr;
+          }
+          const {entry,report}=fv;
           const why=entry.fromHeadword?'pagina senza tabella di coniugazione'
             :(report.missing&&report.missing.length)?'tabella incompleta ('+report.missing.join(', ')+')'
             :(report.repairs&&report.repairs.length)?'forme con caratteri non greci ('+report.repairs.join('; ')+')':'';
