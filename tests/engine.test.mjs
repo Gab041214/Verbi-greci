@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {LEXICON} from '../src/js/lexicon.js';
-import {loadLexicon,buildIndex,keyOf,guessEntry,conjugate,parseDslLine,entryToDsl} from '../src/js/engine.js';
+import {loadLexicon,buildIndex,keyOf,guessEntry,conjugate,parseDslLine,entryToDsl,finalizeEntry} from '../src/js/engine.js';
 const list=loadLexicon(LEXICON);const idx=buildIndex(list);
 const forms=(k,voice,tense)=>{const e=idx.get(keyOf(k)).e;const v=e._voices.find(x=>x.id===voice);
   const c=['ind','sub','imp'].flatMap(g=>v.cards[g]).find(c=>c.id===tense);return c&&c.forms;};
@@ -41,4 +41,10 @@ test('esportazione: lo stato delle lettere viaggia nello stesso file e non distu
   assert.equal(bulkFromJson(j)['α'].saved,3);
   assert.equal(bulkFromJson(toJson([])),null);
   assert.equal(bulkFromJson('[]'),null);
+});
+
+test('traduzione della voce passiva: esportata e reimportata',()=>{
+  const e=finalizeEntry({forms:['γράφω'],cls:'A',gloss:'scrivere',gloss_p:'essere scritto',O:{}});
+  const back=fromJson(toJson([e]))[0];
+  assert.equal(back.gloss_p,'essere scritto');
 });
