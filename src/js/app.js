@@ -12,6 +12,7 @@ const PERS=['εγώ','εσύ','αυτός/-ή/-ό','εμείς','εσείς','α
 const GROUPS=[['ind','Indicativo','Οριστική'],['sub','Congiuntivo (με «να»)','Υποτακτική'],['imp','Imperativo','Προστακτική'],['nom','Forme nominali','Άκλιτοι τύποι']];
 const cell=f=>String(f).split(' / ').map(x=>'<span lang="el">'+esc(x)+'</span>').join('<br>');
 const glossIsEn=e=>!!e.gloss_en&&e.gloss===e.gloss_en;
+const VER_TAG=' <span class="tag warn" title="Traduzione della voce attiva: la voce passiva può avere un altro significato">da verificare</span>';
 const EN_TAG=' <span class="tag warn" title="Significato in inglese: correggilo in italiano">EN</span>';
 const SRC={base:'Lessico',extra:'Repository',wiktionary:'Wiktionary',manual:'Manuale',derived:'Derivato',user:'Mio'};
 
@@ -59,8 +60,10 @@ function renderEntry(el,e,voiceId,opts={}){
   const vs=safeConj(e);
   if(!vs||!vs.length){el.innerHTML='<p class="msg bad">Non riesco a coniugare questo verbo con i dati attuali.</p>';return;}
   const v=vs.find(x=>x.id===voiceId)||vs[0];
-  let h=`<section class="hero"><div class="lemma" lang="el">${esc(e.display)}</div>`;
-  if(e.gloss)h+=`<div class="gloss">${esc(e.gloss)}${glossIsEn(e)?EN_TAG:''}</div>`;
+  const pas=v.id==='pass'&&vs.length>1&&v.raw&&v.raw.pres&&v.raw.pres[0];
+  let h=`<section class="hero"><div class="lemma" lang="el">${esc(pas?v.raw.pres[0]:e.display)}</div>`;
+  const gl=pas&&e.gloss_p?e.gloss_p:e.gloss;
+  if(gl)h+=`<div class="gloss">${esc(gl)}${pas&&!e.gloss_p?VER_TAG:''}${!(pas&&e.gloss_p)&&glossIsEn(e)?EN_TAG:''}</div>`;
   h+=`<div class="tags"><span class="tag">${esc(CLASS_DESC[e.cls]||e.cls)}</span>`;
   const o=e._origin||e.source;
   if(o&&!e.guessed)h+=`<span class="tag">${esc(SRC[e.edited?'user':(e.source==='wiktionary'?'wiktionary':o)]||o)}${e.edited?' · corretto':''}</span>`;
@@ -300,14 +303,17 @@ function openManual(lemma,src){
 /* ---------- pop-up: correggi traduzione ---------- */
 function openGloss(e,src){
   closeGloss(true);
+  const pv=show.voice==='pass'&&e._voices&&e._voices.length>1&&e._voices.find(x=>x.id==='pass');
+  const pl=pv&&pv.raw&&pv.raw.pres&&pv.raw.pres[0];
+  const gv=pl?(e.gloss_p||e.gloss):e.gloss;
   const d=document.createElement('div');d.className='ovl';d.id='gl';
-  d.innerHTML=`<div class="pop" role="dialog" aria-modal="true" aria-labelledby="gl-t"><h3 id="gl-t">Traduzione di <span lang="el">${esc(e.lemma)}</span></h3>${glossIsEn(e)?'<p class="mute">Il significato è ancora in inglese: scrivilo in italiano.</p>':''}<input id="gl-i" value="${esc(e.gloss)}" placeholder="es. votare" autocomplete="off"><div class="row wrapbtn"><button type="button" class="btn pri" id="gl-s">Salva</button><button type="button" class="btn" id="gl-x">Chiudi</button></div></div>`;
+  d.innerHTML=`<div class="pop" role="dialog" aria-modal="true" aria-labelledby="gl-t"><h3 id="gl-t">Traduzione di <span lang="el">${esc(pl||e.lemma)}</span>${pl?' (voce passiva)':''}</h3>${!pl&&glossIsEn(e)?'<p class="mute">Il significato è ancora in inglese: scrivilo in italiano.</p>':''}<input id="gl-i" value="${esc(gv)}" placeholder="es. votare" autocomplete="off"><div class="row wrapbtn"><button type="button" class="btn pri" id="gl-s">Salva</button><button type="button" class="btn" id="gl-x">Chiudi</button></div></div>`;
   document.body.appendChild(d);ovlOrigin(d,src);
   d.onclick=ev=>{if(ev.target===d)closeGloss();};
   $('gl-x').onclick=closeGloss;
   $('gl-s').onclick=async()=>{
     const g=$('gl-i').value.trim();
-    const ne=hydrate({...e,O:e.O});ne.O=JSON.parse(JSON.stringify(e.O||{}));ne.gloss=g;
+    const ne=hydrate({...e,O:e.O});ne.O=JSON.parse(JSON.stringify(e.O||{}));if(pl){if(g)ne.gloss_p=g;else delete ne.gloss_p;}else ne.gloss=g;
     if(!ne.source||ne.source==='base'||ne.source==='extra')ne.source=e.source||'manual';
     const saved=await saveUser(ne,{edited:true});
     closeGloss();toast('Traduzione salvata');
@@ -430,12 +436,14 @@ $('bulk').onclick=async()=>{
       let {titles,next}=await listVerbs(bulkCont);
       bulkCont=next;
       if(L)titles=titles.filter(t=>keyOf(t).startsWith(L));
+      /* le forme passive (-μαι) per ultime: così, se il verbo attivo viene importato in questa stessa pagina, la sua voce passiva c'è già */
+      titles=[...titles.filter(t=>!/μαι$/.test(t)),...titles.filter(t=>/μαι$/.test(t))];
       $('bprog').max=Math.max(titles.length,1);
       let i=0;
       for(const t of titles){
         if(stopBulk)break;
         i++;$('bprog').value=i;
-        if(BYID.has(keyOf(t))){skipped++;continue;}
+        if(BYID.has(keyOf(t))||INDEX.has(keyOf(t))){skipped++;continue;}
         try{
           /* in blocco nessuno controlla le forme: si salvano solo verbi con la tabella letta per intero */
           let fv=null,ferr=null;

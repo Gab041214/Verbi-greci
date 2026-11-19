@@ -316,7 +316,7 @@ function entryToDsl(e){
 /* copia serializzabile (senza campi calcolati) */
 function serializeEntry(e){
   const o={};
-  ['forms','cls','gloss','a','s','p','m','i','ps','pc','k','no','source','gloss_en','updated','edited'].forEach(k=>{if(e[k]!==undefined&&e[k]!=='')o[k]=e[k];});
+  ['forms','cls','gloss','a','s','p','m','i','ps','pc','k','no','source','gloss_en','gloss_p','updated','edited'].forEach(k=>{if(e[k]!==undefined&&e[k]!=='')o[k]=e[k];});
   o.O=JSON.parse(JSON.stringify(e.O||{}));
   return o;
 }
