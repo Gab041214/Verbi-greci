@@ -214,7 +214,7 @@ export function diagnose(html,title,isText){
   const hints=['NavFrame','mw-collapsible','inflection','conjug','Conjugation','<div class="[^"]*table','<dl','<ul'].map(k=>k+'='+(base.match(new RegExp(k,'gi'))||[]).length);
   out.push('indizi: '+hints.join(' · '));
   const ci=base.search(/id="Conjugation/i);
-  if(ci>=0)out.push('dopo «Conjugation»: '+base.slice(ci,ci+500).replace(/\s+/g,' '));
+  if(ci>=0)out.push('dopo «Conjugation» (testo): '+htmlText(base.slice(ci,ci+3000)).replace(/\s+/g,' ').slice(0,400));
   const tabs=[...base.matchAll(/<table[^>]*>/gi)].map(m=>(m[0].match(/class="([^"]*)"/)||[,''])[1]);
   out.push('tabelle ('+tabs.length+'): '+tabs.join(' ; '));
   const rows=htmlToRows(base);
