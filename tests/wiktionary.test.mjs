@@ -180,3 +180,21 @@ test('rowsToEntry segnala le forme corrette per caratteri latini',()=>{
   const {report}=rowsToEntry(rows,'γράφω');
   assert.ok(report.repairs&&report.repairs.length>0);
 });
+
+/* ---- pagine senza tabella che rimandano alla coniugazione di un altro verbo ---- */
+import {redirectTarget,fetchVerb as fetchV2,lookupForm as lookupF2} from '../src/js/wiktionary.js';
+const RED='<h2 id="Greek">Greek</h2><h3 id="Verb">Verb</h3><p><strong class="Greek headword">ξυπνώ</strong></p><ol><li><i>alternative form of</i> <a href="/wiki/x" title="ξυπνάω">ξυπνάω</a> to wake</li></ol><h4 id="Conjugation">Conjugation</h4><p><i>see this verb\'s full conjugation at: <a href="/wiki/x" title="ξυπνάω">ξυπνάω</a></i></p>';
+test('redirectTarget: riconosce il rimando alla coniugazione e ignora le pagine con tabella',()=>{
+  assert.equal(redirectTarget(RED,'ξυπνώ'),'ξυπνάω');
+  assert.equal(redirectTarget(RED,'ξυπνάω'),null);
+  assert.equal(redirectTarget(readFileSync(new URL('./fixtures/grafo.html',import.meta.url),'utf8'),'γράφω'),null);
+});
+test('fetchVerb e lookupForm seguono il rimando e lo segnalano',async()=>{
+  const grafo=readFileSync(new URL('./fixtures/grafo.html',import.meta.url),'utf8');
+  const f=async u=>{const p=new URL(u).searchParams.get('page');return {ok:true,json:async()=>({parse:{title:p,text:p==='ξυπνώ'?RED:grafo}})};};
+  const r=await fetchV2('ξυπνώ',f);
+  assert.deepEqual(r.report.redirect,{from:'ξυπνώ',to:'ξυπνάω'});
+  assert.ok(r.entry.O.pres);
+  const l=await lookupF2('ξυπνώ',f);
+  assert.equal(l.kind,'lemma');assert.equal(l.report.redirect.to,'ξυπνάω');
+});
