@@ -329,7 +329,8 @@ function reportHtml(r){
   if(!r)return '';
   if(r.noTable)return `<p class="warn">Wiktionary non ha la tabella di coniugazione per questo verbo. Le forme sono calcolate con le regole${r.notes&&r.notes.length?' ('+esc(r.notes.join('; '))+')':''}: controllale e correggile se serve.</p>`;
   const miss=(r.missing||[]);
-  const rep=(r.repairs&&r.repairs.length)?`<p class="warn">Forme corrette per caratteri non greci (controllale): ${esc(r.repairs.join('; '))}</p>`:'';
+  const rd=r.redirect?`<p class="ok">«${esc(r.redirect.from)}» rimanda a «${esc(r.redirect.to)}»: ecco la coniugazione di ${esc(r.redirect.to)}.</p>`:'';
+  const rep=rd+((r.repairs&&r.repairs.length)?`<p class="warn">Forme corrette per caratteri non greci (controllale): ${esc(r.repairs.join('; '))}</p>`:'');
   return rep+(miss.length?`<p class="warn">Dati non trovati nella tabella (verranno calcolati con le regole): ${esc(miss.join(', '))}</p>`:'<p class="ok">Tabella letta completamente.</p>');
 }
 function rescue(el,verb){
@@ -382,14 +383,15 @@ function bulkMarks(){
 }
 $('bletter').onchange=()=>{bulkCont=null;const x=bulkState()[$('bletter').value];PROB.length=0;if(x)PROB.push(...(x.problems||[]));bulkProblems();bulkMarks();};
 setTimeout(bulkMarks,0);
-const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
+let ALT=0;
+const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · forme alternative ${ALT} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
 function bulkProblems(){
   $('bprob').hidden=!PROB.length;
   $('bprob-list').textContent=PROB.map(p=>p.t+' — '+p.why).join('\n');
 }
 $('bulk').onclick=async()=>{
   stopBulk=false;$('bulk').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
-  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;}bulkProblems();
+  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;}bulkProblems();
   try{
     do{
       const L=$('bletter').value;
@@ -405,6 +407,7 @@ $('bulk').onclick=async()=>{
         try{
           /* in blocco nessuno controlla le forme: si salvano solo verbi con la tabella letta per intero */
           const {entry,report}=await fetchVerb(t);
+          if(report.redirect){ALT++;bulkLog(done,skipped,t);continue;}
           const why=entry.fromHeadword?'pagina senza tabella di coniugazione'
             :(report.missing&&report.missing.length)?'tabella incompleta ('+report.missing.join(', ')+')'
             :(report.repairs&&report.repairs.length)?'forme con caratteri non greci ('+report.repairs.join('; ')+')':'';

@@ -210,6 +210,11 @@ export function diagnose(html,title,isText){
   out.push('lunghezza pagina: '+html.length+' · sezione Greek: '+(sec?sec.length:'NON TROVATA'));
   out.push('titoli h2: '+[...html.matchAll(/<h2[^>]*id="([^"]*)"/g)].map(m=>m[1]).join(', '));
   const base=sec||html;
+  out.push('sottotitoli: '+[...base.matchAll(/<h[3-6][^>]*id="([^"]*)"/g)].map(m=>m[1]).join(', '));
+  const hints=['NavFrame','mw-collapsible','inflection','conjug','Conjugation','<div class="[^"]*table','<dl','<ul'].map(k=>k+'='+(base.match(new RegExp(k,'gi'))||[]).length);
+  out.push('indizi: '+hints.join(' · '));
+  const ci=base.search(/id="Conjugation/i);
+  if(ci>=0)out.push('dopo «Conjugation»: '+base.slice(ci,ci+500).replace(/\s+/g,' '));
   const tabs=[...base.matchAll(/<table[^>]*>/gi)].map(m=>(m[0].match(/class="([^"]*)"/)||[,''])[1]);
   out.push('tabelle ('+tabs.length+'): '+tabs.join(' ; '));
   const rows=htmlToRows(base);
@@ -243,7 +248,7 @@ function parseGreekVerbHtml0(html,title){
   }
   const {entry,report}=rowsToEntry(htmlToRows(sec),title);
   const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
-  if(!entry.O.pres&&!entry.O.ppres)throw new Error('Tabella di coniugazione non trovata per '+title+' (non è un verbo del greco moderno?)');
+  if(!entry.O.pres&&!entry.O.ppres)throw new Error('Tabella di coniugazione non trovata per '+title+' (la pagina non ha una tabella leggibile né la riga del verbo)');
   return {entry,report};
 }
 export function parsePastedText(text,title){
@@ -265,9 +270,20 @@ async function api(params,f){
   if(j.error)throw new Error(j.error.info||j.error.code);
   return j;
 }
-export async function fetchVerb(title,f=fetch){
+/* pagina senza tabella che rimanda alla coniugazione di un altro verbo («see this verb's full conjugation at: ξεχνάω») */
+export function redirectTarget(html,title){
+  const sec=greekSection(html);
+  if(!sec||/<table/i.test(sec))return null;
+  const m=sec.match(/full conjugation at:?[\s\S]{0,80}?<a\b[^>]*>([^<]+)<\/a>/i)||sec.match(/alternative (?:form|spelling) of[\s\S]{0,120}?<a\b[^>]*>([^<]+)<\/a>/i);
+  const t=m?decode(m[1]).trim():'';
+  return t&&t!==title&&/^[α-ωά-ώϊϋΐΰ]+$/i.test(t)?t:null;
+}
+export async function fetchVerb(title,f=fetch,depth=0){
   const j=await api({action:'parse',page:title,prop:'text',redirects:'1'},f);
-  return parseGreekVerbHtml(j.parse.text,title);
+  const html=j.parse.text;
+  const to=depth<2?redirectTarget(html,title):null;
+  if(to){const r=await fetchVerb(to,f,depth+1);r.report={...r.report,redirect:{from:title,to}};return r;}
+  return parseGreekVerbHtml(html,title);
 }
 /* rimandi «forma di …» nella sezione Greek: verbi a cui appartiene una forma flessa */
 export function formOfLemmas(sec,title){
@@ -296,6 +312,8 @@ export function formOfLemmas(sec,title){
 export async function lookupForm(title,f=fetch){
   const j=await api({action:'parse',page:title,prop:'text',redirects:'1'},f);
   const html=j.parse.text;
+  const to=redirectTarget(html,title);
+  if(to){const r=await fetchVerb(to,f,1);r.report={...r.report,redirect:{from:title,to}};return {kind:'lemma',...r};}
   let res=null;
   try{res=parseGreekVerbHtml(html,title);}catch(_){res=null;}
   if(res&&res.entry&&res.entry.O&&res.entry.O.pres&&!res.report.noTable)return {kind:'lemma',...res};
