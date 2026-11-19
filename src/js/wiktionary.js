@@ -130,7 +130,7 @@ function columnsFor(header,ncol){
 
 export function rowsToEntry(rows,title){
   const O={};const report={found:[],missing:[]};REPAIRS=[];
-  let header=null,bi=0,imp=0;
+  let header=null,bi=0,imp=0,defective=false;
   for(let i=0;i<rows.length;i++){
     const r=rows[i];
     if(isHeader(r)){header=r;continue;}
@@ -139,8 +139,23 @@ export function rowsToEntry(rows,title){
       if(pb){
         i=pb.end-1;
         const blk=pb.blk;
-        if(blk.some(x=>x.slice(1).some(c=>/^θα\s/.test(c))))continue;
-        const ncol=Math.max(...blk.map(x=>x.length-1));
+        const isFut=k=>blk.some(x=>/^θα\s/.test((x[k+1]||'').trim()));
+        const ncol0=Math.max(...blk.map(x=>x.length-1));
+        const futCols=[...Array(ncol0).keys()].filter(isFut);
+        if(futCols.length===ncol0)continue;
+        /* verbo difettivo solo passivo (ωρύομαι): colonne Presente | Imperfetto | Futuro, senza aspetto perfettivo */
+        const passOnly=header&&/passive/i.test(header.join(' '))&&!/active/i.test(header.join(' '))&&colMap(header).length<ncol0;
+        const noPerf=!rows.some(x=>/(?<![a-zα-ω])perfective/i.test(x.join(' ')));
+        if(futCols.length&&passOnly&&noPerf&&bi===0){
+          const cols=[...Array(ncol0).keys()].filter(k=>!futCols.includes(k));
+          ['ppres','pimpf'].forEach((key,n)=>{
+            const arr=blk.map(x=>cleanCell(x[cols[n]+1]));
+            if(arr.filter(Boolean).length>=6)O[key]=arr;else if(cols[n]!==undefined)report.missing.push(key+' (incompleto)');
+          });
+          defective=true;bi++;continue;
+        }
+        if(futCols.length)continue;
+        const ncol=ncol0;
         columnsFor(header,ncol).forEach((c,k)=>{
           const arr=blk.map(x=>cleanCell(x[k+1]));
           const filled=arr.filter(Boolean).length;
@@ -184,7 +199,8 @@ export function rowsToEntry(rows,title){
   const cls=inferClass(title,O);
   const entry={forms:[title],cls,gloss:'',O,source:'wiktionary',updated:new Date().toISOString().slice(0,10)};
   if(m)entry.m=m;
-  const want=cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
+  if(defective){entry.no='aor,saor,fut2,perf,plup,fperf,sperf,iaor';}
+  const want=defective?['ppres','pimpf']:cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
   want.forEach(k=>{if(O[k])report.found.push(k);else report.missing.push(k);});
   if(!cls.startsWith('D')&&(O.ppres||O.paor))report.found.push('passivo');
   ['ipres','iaor','ptc'].forEach(k=>{if(O[k])report.found.push(k);});
