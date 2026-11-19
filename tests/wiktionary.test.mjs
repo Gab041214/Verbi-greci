@@ -198,3 +198,11 @@ test('fetchVerb e lookupForm seguono il rimando e lo segnalano',async()=>{
   const l=await lookupF2('ξυπνώ',f);
   assert.equal(l.kind,'lemma');assert.equal(l.report.redirect.to,'ξυπνάω');
 });
+
+test('pagina con «needs an inflection-table template»: verbo senza tabella, non un errore di lettura',()=>{
+  const H='<h2 id="Greek">Greek</h2><h3 id="Verb">Verb</h3><p><strong class="Greek headword">ξεβιδώνω</strong></p><ol><li>to unscrew</li></ol><h4 id="Conjugation">Conjugation</h4><p style="font-size: smaller">This verb needs an inflection-table template.</p>';
+  const {entry,report}=parseGreekVerbHtml(H,'ξεβιδώνω');
+  assert.ok(report.noTable);
+  assert.ok(entry.fromHeadword);
+  assert.equal(entry.gloss_en,'to unscrew');
+});
