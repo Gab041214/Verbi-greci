@@ -232,8 +232,33 @@ test('verbo difettivo solo passivo (ωρύομαι): presente e imperfetto, futu
   assert.equal(entry.cls,'D');
   assert.equal(entry.O.ppres[0],'ωρύομαι');
   assert.equal(entry.O.pimpf[2],'ωρυόταν(ε)');
+  assert.deepEqual(entry.O.ptc,['ωρυόμενος']);
   assert.deepEqual(report.missing,[]);
   const v=conjugate(finalizeEntry(entry)).find(x=>x.id==='pass');
   assert.ok(v);
   assert.ok(!v.cards.ind.some(c=>c.id==='aor'));
+});
+
+test('verbo difettivo solo attivo (θωρώ): presente e imperfetto, classe B2',()=>{
+  const rows=[
+    ['','Active voice ➤ — Imperfective aspect ➤'],
+    ['Indicative mood ➤','Present ➤','Imperfect ➤','Future ➤'],
+    ['1 sg','θωρώ','θωρούσα','θα θωρώ'],['2 sg','θωρείς','θωρούσες','θα θωρείς'],['3 sg','θωρεί','θωρούσε','θα θωρεί'],[''],
+    ['1 pl','θωρούμε','θωρούσαμε','θα θωρούμε'],['2 pl','θωρείτε','θωρούσατε','θα θωρείτε'],['3 pl','θωρούν(ε)','θωρούσαν(ε)','θα θωρούν(ε)'],
+    ['Other forms','Present participle ➤'],['','θωρώντας ➤'],
+  ];
+  const {entry,report}=rowsToEntry(rows,'θωρώ');
+  assert.equal(entry.cls,'B2');
+  assert.equal(entry.O.impf[0],'θωρούσα');
+  assert.deepEqual(report.missing,[]);
+  const v=conjugate(finalizeEntry(entry)).find(x=>x.id==='act');
+  assert.ok(!v.cards.ind.some(c=>c.id==='aor'));
+});
+test('forme con trattino iniziale (usate nei composti) e pagina con solo la riga del verbo',()=>{
+  assert.equal(cleanCell('‑θλίφτηκα, [{-εθλίβην}]'),'θλίφτηκα');
+  assert.equal(cleanCell('‑θλιφτείτε, -θλιβείτε'),'θλιφτείτε / θλιβείτε');
+  assert.equal(cleanCell('θλίβουμε, [θλίβομε]'),'θλίβουμε');
+  const page='<h2 id="Greek">Greek</h2><h3 id="Pronunciation">Pronunciation</h3><ul><li>IPA</li></ul><h3 id="Verb">Verb</h3><p><span class="headword-line"><strong class="Grek headword">θαρρώ</strong> • (<i>tharró</i>)</span></p><ol><li>to think</li></ol>';
+  const {entry}=parseGreekVerbHtml(page,'θαρρώ');
+  assert.ok(entry.fromHeadword);
 });
