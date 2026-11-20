@@ -67,6 +67,8 @@ function splitForms(s){
   /* note di rimando tipo «(προλαμβάνω →)»: le parentesi con spazi o frecce non fanno parte della forma; «(ε)» invece sì */
   s=normGreek(s).replace(/\s*\([^)]*[\s→➤][^)]*\)/g,'');
   s=s.replace(/➤/g,'').replace(/[—–]/g,'');
+  /* forme usate soprattutto nei composti: «‑θλίφτηκα, ‑θλιφτήκαμε» (trattino davanti, cella intera) */
+  if(/^\s*[‑‐-][α-ωά-ώ]/.test(s))s=s.replace(/(^|[\s,;\/])[‑‐-]+(?=[α-ωά-ώ])/g,'$1');
   s=s.replace(/\s+-\s*|\s*-\s+/g,', ');   // «forma - variante colloquiale»
   const toks=s.split(/\s*[,;\/]\s*/).map(t=>t.trim()).filter(Boolean).map(repairToken)
     .filter(t=>GREEK_FORM.test(t));
@@ -144,11 +146,13 @@ export function rowsToEntry(rows,title){
         const futCols=[...Array(ncol0).keys()].filter(isFut);
         if(futCols.length===ncol0)continue;
         /* verbo difettivo solo passivo (ωρύομαι): colonne Presente | Imperfetto | Futuro, senza aspetto perfettivo */
-        const passOnly=header&&/passive/i.test(header.join(' '))&&!/active/i.test(header.join(' '))&&colMap(header).length<ncol0;
+        const hdr=header?header.join(' '):'';
+        const passOnly=/passive/i.test(hdr)&&!/active/i.test(hdr)&&colMap(header).length<ncol0;
+        const actOnly=/active/i.test(hdr)&&!/passive/i.test(hdr)&&colMap(header).length<ncol0;
         const noPerf=!rows.some(x=>/(?<![a-zα-ω])perfective/i.test(x.join(' ')));
-        if(futCols.length&&passOnly&&noPerf&&bi===0){
+        if(futCols.length&&(passOnly||actOnly)&&noPerf&&bi===0){
           const cols=[...Array(ncol0).keys()].filter(k=>!futCols.includes(k));
-          ['ppres','pimpf'].forEach((key,n)=>{
+          (passOnly?['ppres','pimpf']:['pres','impf']).forEach((key,n)=>{
             const arr=blk.map(x=>cleanCell(x[cols[n]+1]));
             if(arr.filter(Boolean).length>=6)O[key]=arr;else if(cols[n]!==undefined)report.missing.push(key+' (incompleto)');
           });
@@ -186,6 +190,16 @@ export function rowsToEntry(rows,title){
         imp++;continue;
       }
     }
+    /* tabelle difettive: i nomi dei participi sono nelle celle di una riga, le forme nella riga seguente */
+    if(r.slice(1).some(c=>/present participle|perfect participle/i.test(c))&&rows[i+1]){
+      r.forEach((c,k)=>{
+        if(k===0)return;
+        const f=cleanCell(rows[i+1][k]);
+        if(!f)return;
+        if(/present participle/i.test(c)&&!O.ptc)O.ptc=[f.split(' / ')[0]];
+        if(/perfect participle/i.test(c)&&!O.__m)O.__m=f.split(' / ')[0];
+      });
+    }
     const l=lab(r);
     if(/gerund|active participle|present participle/.test(l)){
       const v=r.slice(1).map(cleanCell).find(Boolean);if(v&&!O.ptc)O.ptc=[v.split(' / ')[0]];
@@ -200,7 +214,7 @@ export function rowsToEntry(rows,title){
   const entry={forms:[title],cls,gloss:'',O,source:'wiktionary',updated:new Date().toISOString().slice(0,10)};
   if(m)entry.m=m;
   if(defective){entry.no='aor,saor,fut2,perf,plup,fperf,sperf,iaor';}
-  const want=defective?['ppres','pimpf']:cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
+  const want=defective?(O.ppres?['ppres','pimpf']:['pres','impf']):cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
   want.forEach(k=>{if(O[k])report.found.push(k);else report.missing.push(k);});
   if(!cls.startsWith('D')&&(O.ppres||O.paor))report.found.push('passivo');
   ['ipres','iaor','ptc'].forEach(k=>{if(O[k])report.found.push(k);});
@@ -259,6 +273,8 @@ function parseGreekVerbHtml0(html,title){
     let h=headwordInfo(sec);
     /* Wiktionary segnala esplicitamente che manca la tabella: il verbo esiste, la coniugazione no */
     if(!h&&/needs an inflection-table template/i.test(htmlText(sec)))h={};
+    /* nessuna tabella né sezione Conjugation, ma c'è la riga del verbo */
+    if(!h&&sec.includes('headword-line')&&!/id="Conjugation"/.test(sec))h={};
     if(h){
       const entry={forms:[title],cls:null,gloss:'',O:{},source:'wiktionary',updated:new Date().toISOString().slice(0,10),fromHeadword:h};
       const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
