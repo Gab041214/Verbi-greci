@@ -273,7 +273,9 @@ export function headwordInfo(sec){
 function parseGreekVerbHtml0(html,title){
   const sec=greekSection(html);
   if(!sec)throw new Error('Nessuna sezione «Greek» nella pagina di '+title);
-  if(!/<table/i.test(sec)){
+  /* senza tabella di coniugazione: nessuna <table>, oppure solo tabelle di avviso («lacks references») e la frase «needs an inflection-table template» */
+  const noInfl=!/<table[^>]*inflection-table/i.test(sec)&&/needs an inflection-table template/i.test(htmlText(sec));
+  if(!/<table/i.test(sec)||noInfl){
     let h=headwordInfo(sec);
     /* Wiktionary segnala esplicitamente che manca la tabella: il verbo esiste, la coniugazione no */
     if(!h&&/needs an inflection-table template/i.test(htmlText(sec)))h={};
