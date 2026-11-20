@@ -67,6 +67,10 @@ function splitForms(s){
   /* note di rimando tipo «(προλαμβάνω →)»: le parentesi con spazi o frecce non fanno parte della forma; «(ε)» invece sì */
   s=normGreek(s).replace(/\s*\([^)]*[\s→➤][^)]*\)/g,'');
   s=s.replace(/➤/g,'').replace(/[—–]/g,'');
+  /* «A → B»: la freccia indica la forma che prevale (B); le tengo entrambe, B per prima */
+  s=s.replace(/([α-ωά-ώ]+(?:\([α-ω]\))?)\s*→\s*([α-ωά-ώ]+(?:\([α-ω]\))?)/g,'$2, $1');
+  /* una sola parola tra parentesi dopo uno spazio = variante facoltativa o formale: «φανταστώ (φαντασθώ)» */
+  s=s.replace(/\s\([^()\s]+\)/g,'');
   /* forme usate soprattutto nei composti: «‑θλίφτηκα, ‑θλιφτήκαμε» (trattino davanti, cella intera) */
   if(/^\s*[‑‐-][α-ωά-ώ]/.test(s))s=s.replace(/(^|[\s,;\/])[‑‐-]+(?=[α-ωά-ώ])/g,'$1');
   s=s.replace(/\s+-\s*|\s*-\s+/g,', ');   // «forma - variante colloquiale»
