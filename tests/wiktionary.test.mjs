@@ -270,3 +270,9 @@ test('varianti tra parentesi dopo uno spazio e frecce «A → B»',()=>{
   assert.equal(cleanCell('φωτογραφώ (φωτογραφίζω →)'),'φωτογραφώ');
   assert.equal(cleanCell('θωρούν(ε)'),'θωρούν(ε)');
 });
+
+test('verbo senza tabella ma con tabella di avviso nella pagina (χαλκοκολλώ)',()=>{
+  const page='<h2 id="Greek">Greek</h2><h3 id="Verb">Verb</h3><p><span class="headword-line"><strong class="Grek headword">χαλκοκολλώ</strong></span></p><ol><li>to braze</li></ol><h4 id="Conjugation">Conjugation</h4><p>This verb needs an inflection-table template.</p><table class="box-Unreferenced"><tr><td>This section or entry lacks references or sources.</td></tr></table>';
+  const {entry}=parseGreekVerbHtml(page,'χαλκοκολλώ');
+  assert.ok(entry.fromHeadword);
+});
