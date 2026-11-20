@@ -262,3 +262,11 @@ test('forme con trattino iniziale (usate nei composti) e pagina con solo la riga
   const {entry}=parseGreekVerbHtml(page,'θαρρώ');
   assert.ok(entry.fromHeadword);
 });
+
+test('varianti tra parentesi dopo uno spazio e frecce «A → B»',()=>{
+  assert.equal(cleanCell('φανταστώ (φαντασθώ)'),'φανταστώ');
+  assert.equal(cleanCell('φαντάστηκα (φαντάσθηκα)'),'φαντάστηκα');
+  assert.equal(cleanCell('φωτογράφησα → φωτογράφισα'),'φωτογράφισα / φωτογράφησα');
+  assert.equal(cleanCell('φωτογραφώ (φωτογραφίζω →)'),'φωτογραφώ');
+  assert.equal(cleanCell('θωρούν(ε)'),'θωρούν(ε)');
+});
