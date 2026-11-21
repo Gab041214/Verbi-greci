@@ -65,7 +65,8 @@ export function textToRows(text){
 /* una cella -> "forma / variante" (solo parole greche; scarta [..], (variante rara), —, "θα …") */
 function splitForms(s){
   /* note di rimando tipo «(προλαμβάνω →)»: le parentesi con spazi o frecce non fanno parte della forma; «(ε)» invece sì */
-  s=normGreek(s).replace(/\s*\([^)]*[\s→➤][^)]*\)/g,'');
+  s=normGreek(s).replace(/\{[^{}]*\}/g,' ');   /* {forme dotte o arcaiche}, anche con virgole dentro */
+  s=s.replace(/\s*\([^)]*[\s→➤][^)]*\)/g,'');
   s=s.replace(/➤/g,'').replace(/[—–]/g,'');
   /* «A → B»: la freccia indica la forma che prevale (B); le tengo entrambe, B per prima */
   s=s.replace(/([α-ωά-ώ]+(?:\([α-ω]\))?)\s*→\s*([α-ωά-ώ]+(?:\([α-ω]\))?)/g,'$2, $1');
@@ -84,7 +85,11 @@ export function cleanCell(s){
   if(main)return main;
   /* solo forme tra [parentesi quadre] (poco usate): meglio di una cella vuota */
   const br=[...s.matchAll(/\[([^\]]*)\]/g)].map(m=>m[1]).join(',');
-  return splitForms(br);
+  const bf=splitForms(br);
+  if(bf)return bf;
+  /* solo forme tra (parentesi tonde) (facoltative): se non c'è altro le tengo */
+  const pr=[...s.matchAll(/\(([α-ωά-ώ]{2,})\)/g)].map(m=>m[1]).join(',');
+  return splitForms(pr);
 }
 const PRON={'εγώ':'1 sg','εσύ':'2 sg','εμείς':'1 pl','εσείς':'2 pl'};
 /* normalizza l'etichetta di riga: "1st person singular" / "1st sg." / "εγώ" -> "1 sg" */
@@ -315,7 +320,7 @@ async function api(params,f){
 export function redirectTarget(html,title){
   const sec=greekSection(html);
   if(!sec||/<table/i.test(sec))return null;
-  const m=sec.match(/full conjugation at:?[\s\S]{0,80}?<a\b[^>]*>([^<]+)<\/a>/i)||sec.match(/alternative (?:form|spelling) of[\s\S]{0,120}?<a\b[^>]*>([^<]+)<\/a>/i);
+  const m=sec.match(/full conjugation at:?[\s\S]{0,80}?<a\b[^>]*>([^<]+)<\/a>/i)||sec.match(/full conjugation see the\s*<a\b[^>]*\btitle="([^"]+)"[^>]*>\s*active form/i)||sec.match(/alternative (?:form|spelling) of[\s\S]{0,120}?<a\b[^>]*>([^<]+)<\/a>/i);
   const t=m?decode(m[1]).trim():'';
   return t&&t!==title&&/^[α-ωά-ώϊϋΐΰ]+$/i.test(t)?t:null;
 }
