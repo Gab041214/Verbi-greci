@@ -276,3 +276,12 @@ test('verbo senza tabella ma con tabella di avviso nella pagina (χαλκοκο�
   const {entry}=parseGreekVerbHtml(page,'χαλκοκολλώ');
   assert.ok(entry.fromHeadword);
 });
+
+test('forme dotte {…} con virgole, celle solo tra parentesi, rimando «see the active form»',()=>{
+  assert.equal(cleanCell('{υπογράφων, ‑ουσα, ‑oν}, υπογράφοντας'),'υπογράφοντας');
+  assert.equal(cleanCell('(υποθαλπόμουν)'),'υποθαλπόμουν');
+  assert.equal(cleanCell('(υποθαλπόμασταν), (‑όμαστε)'),'υποθαλπόμασταν');
+  assert.equal(cleanCell('φανταζόμασταν, (φανταζόμαστε)'),'φανταζόμασταν');
+  const page='<h2 id="Greek">Greek</h2><h3 id="Verb">Verb</h3><h4 id="Conjugation">Conjugation</h4><p>for this verb\'s full conjugation see the <a href="/wiki/%CF%85" title="υποθάλπω">active form</a></p>';
+  assert.equal(redirectTarget(page,'υποθάλπομαι'),'υποθάλπω');
+});
