@@ -155,9 +155,30 @@ async function resolveHeadword(el,entry){
   const done=cls=>{const r=fromHeadword(entry,cls);showPreview(el,r.entry,{found:[],missing:[],noTable:true,notes:r.notes});};
   if(needsClass(entry.forms[0]))askClass(el,entry.forms[0],done,'la pagina non ha la tabella di coniugazione');else done();
 }
+/* forma passiva cercata (es. χορεύομαι) di un verbo che nell'archivio non ha la voce passiva: offro di aggiungerla */
+function passiveOffer(e,q){
+  q=String(q||'').trim();
+  if(!/μαι$/.test(q)||!e||e.cls.startsWith('D')||e.cls==='X')return;
+  const vs=safeConj(e);if(!vs||vs.some(v=>v.id==='pass'))return;
+  $('out').insertAdjacentHTML('afterbegin',`<div class="box addpass"><p><b lang="el">${esc(q)}</b> è la voce passiva di <b lang="el">${esc(e.display)}</b>, che nel tuo archivio non ha la voce passiva.</p><div class="row wrapbtn"><button type="button" class="btn pri" id="addpass">Aggiungi la voce passiva</button></div></div>`);
+  $('addpass').onclick=()=>addPassive(e,q);
+}
+function addPassive(e,q){
+  let g=null,pv=null;
+  try{g=guessEntry(q);pv=g&&conjugate(g).find(v=>v.id==='pass');}catch(_){}
+  if(!pv){toast('Non riesco a calcolare la voce passiva');return;}
+  const r=pv.raw,ne=hydrate({...e,O:JSON.parse(JSON.stringify(e.O||{}))});
+  ne.O.ppres=r.pres;ne.O.pimpf=r.impf;
+  if(r.aor)ne.O.paor=r.aor;
+  if(r.subj)ne.O.psubj=r.subj;
+  if(r.iaor)ne.O.piaor=r.iaor;
+  if(!ne.source||ne.source==='base'||ne.source==='extra')ne.source=e.source||'manual';
+  ne.edited=true;
+  showPreview($('out'),finalizeEntry(ne),{found:[],missing:[],addPass:{form:q,lemma:e.lemma}});
+}
 async function pickLemma(l,voice,q,el=$('out')){
   const hit=INDEX.get(keyOf(l));
-  if(hit){show(hit.e,voice||hit.voice);const fh=FORMS.get(keyOf(q||''));const h=fh&&fh.find(x=>x.e===hit.e);if(h)formNote(q,h);return;}
+  if(hit){show(hit.e,voice||hit.voice);const fh=FORMS.get(keyOf(q||''));const h=fh&&fh.find(x=>x.e===hit.e);if(h)formNote(q,h);else passiveOffer(hit.e,q);return;}
   el.innerHTML='<p class="mute">Scarico da Wiktionary…</p>';
   try{const {entry,report}=await fetchVerb(l);if(entry.fromHeadword)resolveHeadword(el,entry);else showPreview(el,entry,report);}
   catch(err){failBox(el,err,'Importazione non riuscita',l);}
@@ -364,6 +385,7 @@ function download(name,text){
 /* ---------- importazione da Wiktionary ---------- */
 function reportHtml(r){
   if(!r)return '';
+  if(r.addPass)return `<p class="warn">La voce passiva è calcolata con le regole a partire da «${esc(r.addPass.form)}»: controllala, soprattutto l'aoristo passivo (nei verbi irregolari può essere diverso). Il significato e la voce attiva restano quelli del verbo. Salvando, la modifica va nel tuo archivio.</p>`;
   if(r.derived)return `<p class="warn">Wiktionary non ha la tabella di questo verbo. Le forme sono ottenute da «${esc(r.derived.from)}» aggiungendo «${esc(r.derived.prefix)}-» a ogni forma (nelle forme di una sola sillaba l'accento è aggiunto): controllale.${r.derived.extra&&r.derived.extra.length?' Alla prima persona dell\'aoristo ho aggiunto '+r.derived.extra.map(esc).join(', ')+', scritta nella riga del verbo su Wiktionary.':''}${r.derived.noPass?' Le forme passive del verbo base non sono nell\'archivio, quindi mancano anche qui.':''}</p>`;
   if(r.noTable)return `<p class="warn">Wiktionary non ha la tabella di coniugazione per questo verbo. Le forme sono calcolate con le regole${r.notes&&r.notes.length?' ('+esc(r.notes.join('; '))+')':''}: controllale e correggile se serve.</p>`;
   const miss=(r.missing||[]);
@@ -391,14 +413,14 @@ function failBox(el,err,intro,verb){
 function showPreview(el,entry,report){
   entry._origin='preview';
   const gl=esc(entry.gloss||'');
-  el.innerHTML='<div class="box pvbox fix"><div class="pvhead">'+(report&&report.derived?'Anteprima ricavata da '+esc(report.derived.from)+' · non ancora salvata':'Anteprima da Wiktionary · non ancora salvato')+'</div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(in inglese: sostituiscilo con la traduzione)</em>':'')+'<input class="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri pv-s">Salva nell\'archivio</button><button type="button" class="btn pv-x">Scarta</button></div></div>'+reportHtml(report)+'<div class="pv-card"></div>';
+  el.innerHTML='<div class="box pvbox fix"><div class="pvhead">'+(report&&report.addPass?'Anteprima della voce passiva di '+esc(report.addPass.lemma)+' · non ancora salvata':report&&report.derived?'Anteprima ricavata da '+esc(report.derived.from)+' · non ancora salvata':'Anteprima da Wiktionary · non ancora salvato')+'</div><label class="pvg">Significato in italiano'+(glossIsEn(entry)?' <em>(in inglese: sostituiscilo con la traduzione)</em>':'')+'<input class="pv-g" value="'+gl+'" placeholder="es. votare"></label><div class="row wrapbtn"><button type="button" class="btn pri pv-s">Salva nell\'archivio</button><button type="button" class="btn pv-x">Scarta</button></div></div>'+reportHtml(report)+'<div class="pv-card"></div>';
   const q=sel=>el.querySelector(sel);
-  renderEntry(q('.pv-card'),entry,'act');
+  renderEntry(q('.pv-card'),entry,report&&report.addPass?'pass':'act');
   q('.pv-x').onclick=()=>{el.innerHTML='';};
   q('.pv-s').onclick=async()=>{
     const g=q('.pv-g').value.trim();
     if(g)entry.gloss=g;
-    const sv=await saveUser(entry,{});const inSearch=el===$('out');el.innerHTML='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,'act');}
+    const sv=await saveUser(entry,{});const inSearch=el===$('out');el.innerHTML='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,report&&report.addPass?'pass':'act');}
   };
 }
 $('pgo').onclick=()=>{
