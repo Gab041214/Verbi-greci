@@ -7,6 +7,7 @@ import {fromHeadword} from './headword.js';
 import {splitPrefix,deriveEntry} from './derive.js';
 import {initClearable} from './clearable.js';
 import * as marks from './marks.js';
+import {buildRows,toCsv,toTsv,parseTable,planImport} from './translations.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
@@ -14,7 +15,6 @@ const PERS=['εγώ','εσύ','αυτός/-ή/-ό','εμείς','εσείς','α
 const GROUPS=[['ind','Indicativo','Οριστική'],['sub','Congiuntivo (με «να»)','Υποτακτική'],['imp','Imperativo','Προστακτική'],['nom','Forme nominali','Άκλιτοι τύποι']];
 const cell=f=>String(f).split(' / ').map(x=>'<span lang="el">'+esc(x)+'</span>').join('<br>');
 const glossIsEn=e=>!!e.gloss_en&&e.gloss===e.gloss_en;
-const VER_TAG=' <span class="tag warn" title="Traduzione della voce attiva: la voce passiva può avere un altro significato">da verificare</span>';
 const EN_TAG=' <span class="tag warn" title="Significato in inglese: correggilo in italiano">EN</span>';
 const SRC={base:'Lessico',extra:'Repository',wiktionary:'Wiktionary',manual:'Manuale',derived:'Derivato',user:'Mio'};
 
@@ -118,7 +118,8 @@ function renderEntry(el,e,voiceId,opts={}){
   const pas=v.id==='pass'&&vs.length>1&&v.raw&&v.raw.pres&&v.raw.pres[0];
   let h=`<section class="hero"><div class="lemma" lang="el">${esc(pas?v.raw.pres[0]:e.display)}</div>`;
   const gl=pas&&e.gloss_p?e.gloss_p:e.gloss;
-  if(gl)h+=`<div class="gloss">${esc(gl)}${pas&&!e.gloss_p?VER_TAG:''}${!(pas&&e.gloss_p)&&glossIsEn(e)?EN_TAG:''}</div>`;
+  const ver=pas&&!e.gloss_p;   // la voce passiva usa ancora la traduzione dell'attiva: testo nel colore d'avviso
+  if(gl)h+=`<div class="gloss${ver?' gl-ver':''}"${ver?' title="Traduzione della voce attiva: la voce passiva può avere un altro significato"':''}>${esc(gl)}${!(pas&&e.gloss_p)&&glossIsEn(e)?EN_TAG:''}</div>`;
   h+=`<div class="tags"><span class="tag">${esc(CLASS_DESC[e.cls]||e.cls)}</span>`;
   const o=e._origin||e.source;
   if(o&&!e.guessed)h+=`<span class="tag">${esc(SRC[e.edited?'user':(e.source==='wiktionary'?'wiktionary':o)]||o)}${e.edited?' · corretto':''}</span>`;
@@ -462,8 +463,72 @@ function renderArchive(){
     };
   });
 }
-function download(name,text){
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+function download(name,text,type='application/json'){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+
+/* ---------- traduzioni da rivedere ---------- */
+let TRPLAN=null;
+const passLemmaOf=e=>{const v=(safeConj(e)||[]).find(x=>x.id==='pass');return v&&v.raw&&v.raw.pres?v.raw.pres[0]:'';};
+const trRows=()=>buildRows(LIST,passLemmaOf);
+function trReset(){
+  TRPLAN=null;$('tr-sum').hidden=true;$('tr-go').disabled=true;$('tr-ta').value='';$('tr-ta').hidden=true;$('tr-file').value='';
+}
+function trRefresh(){
+  const n=trRows().length;
+  $('tr-n').innerHTML=n?`<b>${n} ${n===1?'verbo ha':'verbi hanno'}</b> la traduzione solo in inglese. Esporta l'elenco, scrivi la traduzione italiana nella terza colonna (e, se serve, nella quinta per la voce passiva), poi importa il file.`:'Nessun verbo ha la traduzione solo in inglese.';
+  $('tr-dl').disabled=$('tr-copy').disabled=!n;
+  trReset();
+}
+function trAnalyze(text){
+  const plan=planImport(parseTable(text),l=>BYID.get(keyOf(l))||null,e=>(e._voices||(safeConj(e),e._voices||[])).some(v=>v.id==='pass'));
+  TRPLAN=plan;
+  const L=[];
+  if(plan.badFormat)L.push('Non riconosco le colonne: servono almeno verbo, inglese e italiano.');
+  else{
+    L.push(plan.nIt+(plan.nIt===1?' traduzione italiana':' traduzioni italiane'));
+    L.push(plan.nPass+(plan.nPass===1?' traduzione della voce passiva':' traduzioni della voce passiva'));
+    if(plan.unchanged)L.push(plan.unchanged+(plan.unchanged===1?' riga già uguale':' righe già uguali')+', saltate');
+    L.push(plan.empty+(plan.empty===1?' riga vuota':' righe vuote')+', '+(plan.empty===1?'saltata':'saltate'));
+    if(plan.passIgnored)L.push(plan.passIgnored+' traduzioni passive ignorate (il verbo non ha la voce passiva)');
+    if(plan.missing.length)L.push(plan.missing.length+(plan.missing.length===1?' verbo non trovato':' verbi non trovati')+' nell\'archivio: '+plan.missing.slice(0,5).map(x=>'<span lang="el">'+esc(x)+'</span>').join(', ')+(plan.missing.length>5?'…':''));
+  }
+  $('tr-sum-t').textContent=plan.changes.length?'Pronto da applicare':'Niente da applicare';
+  $('tr-sum-l').innerHTML=L.join('<br>');
+  $('tr-sum').hidden=false;$('tr-go').disabled=!plan.changes.length;
+}
+async function trApply(){
+  if(!TRPLAN||!TRPLAN.changes.length)return;
+  const ch=TRPLAN.changes;let n=0;
+  $('tr-go').disabled=true;
+  for(const c of ch){
+    const ne=hydrate({...c.e,O:c.e.O});ne.O=JSON.parse(JSON.stringify(c.e.O||{}));
+    if(c.gloss!==null)ne.gloss=c.gloss;
+    if(c.gloss_p!==null)ne.gloss_p=c.gloss_p;
+    if(!ne.source||ne.source==='base'||ne.source==='extra')ne.source=c.e.source||'manual';
+    await saveUser(ne,{edited:true});n++;
+  }
+  ovlClose();renderArchive();trReset();
+  toast(n+(n===1?' verbo aggiornato':' verbi aggiornati'));
+}
+function trInit(){
+  const menuItem=document.querySelector('[data-ovl="ov-tr"]');
+  menuItem.addEventListener('click',trRefresh);
+  $('tr-dl').onclick=()=>{const r=trRows();if(r.length){download('traduzioni-da-rivedere.csv','\ufeff'+toCsv(r),'text/csv;charset=utf-8');toast('File scaricato');}};
+  $('tr-copy').onclick=async()=>{
+    const r=trRows(),t=toTsv(r);
+    try{await navigator.clipboard.writeText(t);toast('Elenco copiato ('+r.length+' verbi)');}
+    catch(_){$('tr-ta').hidden=false;$('tr-ta').value=t;$('tr-ta').select();toast('Seleziona e copia');}
+  };
+  $('tr-file').onchange=async()=>{
+    const f=$('tr-file').files[0];if(!f)return;
+    const t=await f.text();
+    if(t.includes('\ufffd'))toast('Il file non è in UTF-8: salvalo come CSV UTF-8');
+    trAnalyze(t);
+  };
+  $('tr-paste').onclick=()=>{const a=$('tr-ta');a.hidden=!a.hidden;if(!a.hidden)a.focus();};
+  $('tr-ta').addEventListener('input',()=>{if($('tr-ta').value.trim())trAnalyze($('tr-ta').value);});
+  $('tr-go').onclick=trApply;
 }
 
 /* ---------- importazione da Wiktionary ---------- */
@@ -715,6 +780,7 @@ $('f').addEventListener('submit',ev=>{ev.preventDefault();search($('q').value);}
 $('q').addEventListener('input',()=>suggest($('q').value));
 
 initClearable();
+trInit();
 loadAll().then(()=>{window.__ready=true;});
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
