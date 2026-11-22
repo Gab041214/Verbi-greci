@@ -189,10 +189,13 @@ function buildPassive(e){
   if(dep&&(e.a||O.aor||O.subj)){
     const ab=aoristBlock(e);f.aor=ab.aor;f.subj=ab.subj;f.inf=ab.inf;f.iaor=ab.iaor;
   }else if(e.p||O.paor||O.psubj){
+    /* se l'aoristo passivo è stato corretto (es. υποβλήθηκα), congiuntivo, futuro, perfetto e imperativo ne ricavano la radice */
+    let pst=e.p;
+    if(O.paor&&!O.psubj){const m=String(O.paor[0]).split(' / ')[0].match(/^(.+)ηκα$/);if(m)pst=strip(m[1]);}
     f.aor=O.paor||(e.p?pastForms(e.p,['ηκα','ηκες','ηκε','ηκαμε','ηκατε','ηκαν(ε)'],true):null);
-    f.subj=O.psubj||(e.p?['ώ','είς','εί','ούμε','είτε','ούν(ε)'].map(en=>joinAlt(e.p,0,en)):null);
+    f.subj=O.psubj||(pst?['ώ','είς','εί','ούμε','είτε','ούν(ε)'].map(en=>joinAlt(pst,0,en)):null);
     f.inf=O.pinf?O.pinf[0]:(f.subj?f.subj[2].split(' / ')[0]:null);
-    f.iaor=O.piaor||(e.i&&e.p?[fin(stressSyl(strip(e.i)+'ου',lastSyl(e.i))),fin(strip(e.p)+'είτε')]:null);
+    f.iaor=O.piaor||(e.i&&pst?[fin(stressSyl(strip(e.i)+'ου',lastSyl(e.i))),fin(strip(pst)+'είτε')]:null);
   }
   f.m=e.m||null;
   f.ptc=dep&&O.ptc?O.ptc[0]:null;
