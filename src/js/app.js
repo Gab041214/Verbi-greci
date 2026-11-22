@@ -1,4 +1,5 @@
 import {loadLexicon,finalizeEntry,parseDslLine,entryToDsl,buildIndex,buildFormIndex,formVariants,conjugate,guessEntry,keyOf,overrideKey,CLASS_DESC} from './engine.js';
+import {cascadeForms} from './cascade.js';
 import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
 import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktionary.js';
@@ -247,7 +248,7 @@ function openEditor(e,voiceId){
   const vs=safeConj(e);if(!vs)return;
   const v=vs.find(x=>x.id===voiceId)||vs[0];
   const labels=n=>n===2?['εσύ','εσείς']:PERS;
-  let h=`<div class="editor" id="ed"><h3>Correggi: <span lang="el">${esc(e.lemma)}</span> — ${esc(v.label)}</h3><p class="mute">Scrivi le forme esatte. Più varianti separate da « / ». Le celle lasciate invariate continuano a seguire le regole.</p><div class="ef">`;
+  let h=`<div class="editor" id="ed"><h3>Correggi: <span lang="el">${esc(e.lemma)}</span> — ${esc(v.label)}</h3><p class="mute">Scrivi le forme esatte. Più varianti separate da « / ». Le celle lasciate invariate continuano a seguire le regole. Se correggi la 1ª persona singolare di un tempo, le altre persone di quel tempo si ricalcolano (puoi comunque correggerle una per una).</p><div class="ef">`;
   for(const [f,name,n] of FIELDS){
     const raw=v.raw[f];if(!raw)continue;
     h+=`<fieldset><legend>${name}</legend>`+raw.map((x,i)=>`<label><span lang="el">${labels(n)[i]}</span><input lang="el" data-f="${f}" data-i="${i}" data-o="${esc(x)}" value="${esc(x)}" spellcheck="false"></label>`).join('')+`</fieldset>`;
@@ -258,6 +259,19 @@ function openEditor(e,voiceId){
   $('out').insertAdjacentHTML('afterbegin',h);
   $('ed').scrollIntoView({block:'nearest'});
   $('ed-x').onclick=()=>$('ed').remove();
+  /* dalla 1ª persona singolare alle altre cinque dello stesso tempo */
+  $('ed').addEventListener('change',ev=>{
+    const t=ev.target;
+    if(!t.matches||!t.matches('input[data-i="0"]')||!['pres','impf','aor','subj'].includes(t.dataset.f))return;
+    const inps=[...$('ed').querySelectorAll(`input[data-f="${t.dataset.f}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+    if(inps.length<6)return;
+    const res=cascadeForms(inps.map(x=>x.dataset.o),t.value);
+    if(!res){toast('Non riesco a ricalcolare le altre persone: correggile a mano');return;}
+    inps.slice(1).forEach((x,k)=>{
+      if(x.value!==x.dataset.o&&!x.dataset.casc)return;   /* già corretta a mano */
+      x.value=res[k+1];x.dataset.casc='1';
+    });
+  });
   $('ed-s').onclick=async()=>{
     const ne=hydrate({...e,O:e.O});
     ne.O=JSON.parse(JSON.stringify(e.O||{}));
