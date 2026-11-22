@@ -6,6 +6,7 @@ import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktio
 import {fromHeadword} from './headword.js';
 import {splitPrefix,deriveEntry} from './derive.js';
 import {initClearable} from './clearable.js';
+import * as marks from './marks.js';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
@@ -47,10 +48,63 @@ async function saveUser(entry,extra={}){
 }
 function toast(t){const el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),2600);}
 
+/* ---------- «da controllare» ---------- */
+/* piccolo menu in stile vetro sotto un pulsante; si chiude toccando fuori, scorrendo o con Esc */
+function chkMenu(anchor,items){
+  document.querySelectorAll('.cscrim,.cmenu').forEach(x=>x.remove());
+  const sc=document.createElement('div');sc.className='cscrim';
+  const m=document.createElement('div');m.className='cmenu';m.setAttribute('role','menu');
+  m.innerHTML=items.map((x,i)=>`<button type="button" role="menuitem" data-i="${i}"><span>${esc(x.label)}</span><span class="ck">${x.check?'✓':''}</span></button>`).join('');
+  document.body.append(sc,m);
+  const r=anchor.getBoundingClientRect(),mh=m.offsetHeight,mw=m.offsetWidth;
+  let top=r.bottom+4;if(top+mh>innerHeight-8)top=Math.max(8,r.top-mh-4);
+  m.style.top=top+'px';m.style.left=Math.max(8,Math.min(innerWidth-mw-8,r.right-mw+8))+'px';
+  const onk=ev=>{if(ev.key==='Escape')close();};
+  function close(){sc.remove();m.remove();document.removeEventListener('keydown',onk);window.removeEventListener('scroll',onsc,true);}
+  const t0=Date.now(),onsc=()=>{if(Date.now()-t0>400)close();};   // uno scorrimento appena finito non lo chiude
+  sc.onclick=close;
+  document.addEventListener('keydown',onk);window.addEventListener('scroll',onsc,true);
+  m.querySelectorAll('button').forEach(b=>b.onclick=()=>{const x=items[+b.dataset.i];close();x.run();});
+}
+function openFormMenu(btn,ctx){
+  const k=btn.dataset.k,on=marks.has(ctx.id,k);
+  chkMenu(btn,[
+    {label:'Da controllare',check:on,run:()=>{marks.set(ctx.id,k,true);btn.classList.add('on');}},
+    {label:'Controllato',check:!on,run:()=>{marks.set(ctx.id,k,false);btn.classList.remove('on');}}
+  ]);
+}
+/* tutti i segni possibili di un verbo (voce:scheda:posizione) */
+function allMarkKeys(e){
+  const o=[];
+  for(const v of safeConj(e)||[])for(const g of Object.keys(v.cards))for(const c of v.cards[g]){
+    const n=c.forms?c.forms.length:1;for(let i=0;i<n;i++)o.push(marks.markKey(v.id,c.id,i));
+  }
+  return o;
+}
+/* verbi ricavati o calcolati con le regole: segna da subito le forme più incerte (aoristo e derivati) */
+function autoMark(saved,report){
+  if(!saved||!report||!(report.derived||report.addPass||report.noTable))return;
+  const id=keyOf(saved.forms[0]),voices=report.addPass?['pass']:['act','pass'];
+  const keys=[];
+  for(const v of safeConj(saved)||[]){
+    if(!voices.includes(v.id))continue;
+    for(const g of Object.keys(v.cards))for(const c of v.cards[g]){
+      if(!['aor','saor','iaor'].includes(c.id))continue;
+      for(let i=0;i<(c.forms?c.forms.length:1);i++)keys.push(marks.markKey(v.id,c.id,i));
+    }
+  }
+  marks.setMany(id,keys,true);
+}
+
 /* ---------- resa ---------- */
-function card(c){
-  if(c.value!==undefined)return `<article class="card nom"><h4>${esc(c.it)} <small lang="el">${esc(c.gr)}</small></h4><p class="big">${cell(c.value)}</p></article>`;
-  const rows=c.forms.map((f,i)=>`<tr><th lang="el">${c.imp?['εσύ','εσείς'][i]:PERS[i]}</th><td>${cell(f)}</td></tr>`).join('');
+/* pallino «da controllare» di una forma; ctx = {id del verbo, voce} */
+function dotBtn(ctx,cardId,i){
+  const k=marks.markKey(ctx.voice,cardId,i);
+  return `<button type="button" class="dotbtn${marks.has(ctx.id,k)?' on':''}" data-k="${k}" aria-label="Controllo della forma" aria-haspopup="true"><i></i></button>`;
+}
+function card(c,ctx){
+  if(c.value!==undefined)return `<article class="card nom"><h4>${esc(c.it)} <small lang="el">${esc(c.gr)}</small></h4><p class="big${ctx?' chkrow':''}"><span>${cell(c.value)}</span>${ctx?dotBtn(ctx,c.id,0):''}</p></article>`;
+  const rows=c.forms.map((f,i)=>`<tr><th lang="el">${c.imp?['εσύ','εσείς'][i]:PERS[i]}</th><td>${cell(f)}</td>${ctx?`<td class="chk">${dotBtn(ctx,c.id,i)}</td>`:''}</tr>`).join('');
   return `<article class="card"><h4>${esc(c.it)} <small lang="el">${esc(c.gr)}</small></h4><table>${rows}</table></article>`;
 }
 function safeConj(e){
@@ -71,11 +125,14 @@ function renderEntry(el,e,voiceId,opts={}){
   if(e.guessed)h+=`<span class="tag warn">Non presente nel database: forme ipotizzate con regole, da verificare</span>`;
   h+=`</div>${opts.actions?`<div class="acts">${opts.actions}</div>`:''}</section>`;
   h+=vs.length>1?`<div class="seg">`+vs.map(x=>`<button type="button" data-v="${x.id}" class="${x.id===v.id?'on':''}">${esc(x.label)}</button>`).join('')+`</div>`:`<div class="voice-name">${esc(v.label)}</div>`;
+  /* i pallini ci sono solo per i verbi dell'archivio, non per le anteprime */
+  const ctx=['base','extra','user'].includes(e._origin)?{id:keyOf(e.forms[0]),voice:v.id}:null;
   for(const [g,it,gr] of GROUPS){
     const cs=v.cards[g];if(!cs.length)continue;
-    h+=`<h3 class="grp">${it} <small lang="el">${gr}</small></h3><div class="grid">${cs.map(card).join('')}</div>`;
+    h+=`<h3 class="grp">${it} <small lang="el">${gr}</small></h3><div class="grid">${cs.map(c=>card(c,ctx)).join('')}</div>`;
   }
   el.innerHTML=h;
+  if(ctx)el.querySelectorAll('.dotbtn').forEach(b=>b.onclick=()=>openFormMenu(b,ctx));
   el.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{opts.onVoice&&opts.onVoice(b.dataset.v);renderEntry(el,e,b.dataset.v,opts);});
 }
 
@@ -97,7 +154,7 @@ function show(e,voice){
 }
 async function delUser(e){
   if(!confirm('Eliminare «'+e.lemma+'» dal tuo archivio? Se esiste nel lessico di base tornerà la versione originale.'))return false;
-  await store.del(keyOf(e.forms[0]));USER=(await store.getAll()).map(hydrate);rebuild();
+  await store.del(keyOf(e.forms[0]));USER=(await store.getAll()).map(hydrate);rebuild();if(!BYID.has(keyOf(e.forms[0])))marks.clearEntry(keyOf(e.forms[0]));
   if(current&&keyOf(current.forms[0])===keyOf(e.forms[0]))$('out').innerHTML='';
   renderArchive();toast('Eliminato');return true;
 }
@@ -359,11 +416,14 @@ function openGloss(e,src){
 function closeGloss(instant){const d=$('gl');if(!d)return;if(instant===true){d.remove();return;}ovlClose();}
 
 /* ---------- archivio ---------- */
+let onlyChk=false;
 function renderArchive(){
   const k=keyOf($('afilter').value||'');
-  const rows=LIST.filter(e=>!k||e.keys.some(f=>keyOf(f).startsWith(k))||keyOf(e.gloss).split(/[^\p{L}]+/u).some(w=>w.startsWith(k)));
+  const nChk=LIST.filter(e=>marks.count(keyOf(e.forms[0]))>0).length;
+  $('achk-n').textContent=nChk?' · '+nChk:'';$('achk').classList.toggle('on',onlyChk);$('achk').setAttribute('aria-pressed',onlyChk);
+  const rows=LIST.filter(e=>(!k||e.keys.some(f=>keyOf(f).startsWith(k))||keyOf(e.gloss).split(/[^\p{L}]+/u).some(w=>w.startsWith(k)))&&(!onlyChk||marks.count(keyOf(e.forms[0]))>0));
   const shown=rows.slice(0,300);
-  $('alist').innerHTML=shown.map((e,i)=>`<div class="sw" data-i="${i}">${e._origin==='user'?'<button type="button" class="sw-del">Elimina</button>':''}<div class="item" data-l="${esc(e.lemma)}"><span><b lang="el">${esc(e.display)}</b><em>${esc(e.gloss)}</em>${glossIsEn(e)?EN_TAG:''}</span><span class="badge ${e._origin==='user'?'user':''}">${esc(e._origin==='user'?(e.edited?'corretto':SRC[e.source]||'mio'):SRC[e._origin])}</span></div></div>`).join('')+(rows.length>300?`<p class="mute">Mostrati i primi 300 di ${rows.length}: affina il filtro.</p>`:'');
+  $('alist').innerHTML=shown.map((e,i)=>`<div class="sw" data-i="${i}">${e._origin==='user'?'<button type="button" class="sw-del">Elimina</button>':''}<div class="item" data-l="${esc(e.lemma)}"><span><b lang="el">${esc(e.display)}</b><em>${esc(e.gloss)}</em>${glossIsEn(e)?EN_TAG:''}</span><span class="rt"><span class="badge ${e._origin==='user'?'user':''}">${esc(e._origin==='user'?(e.edited?'corretto':SRC[e.source]||'mio'):SRC[e._origin])}</span><button type="button" class="dotbtn${marks.count(keyOf(e.forms[0]))?' on':''}" aria-label="Controllo del verbo" aria-haspopup="true"><i></i></button></span></div></div>`).join('')+(rows.length>300?`<p class="mute">Mostrati i primi 300 di ${rows.length}: affina il filtro.</p>`:'');
   const W=96;
   const closeAll=except=>$('alist').querySelectorAll('.sw.open').forEach(x=>{if(x!==except){x.classList.remove('open','drag');const t=x.querySelector('.item');t.style.transition='transform .22s ease';t.style.transform='';}});
   $('alist').querySelectorAll('.sw').forEach(sw=>{
@@ -385,6 +445,16 @@ function renderArchive(){
       it.addEventListener('pointerup',end);it.addEventListener('pointercancel',end);
       del.onclick=async()=>{const ok=await delUser(e);if(!ok){sw.classList.remove('open','drag');set(0,true);}};
     }
+    const db=it.querySelector('.dotbtn');
+    db.addEventListener('pointerdown',ev=>ev.stopPropagation());
+    db.onclick=ev=>{
+      ev.stopPropagation();
+      const id=keyOf(e.forms[0]),n=marks.count(id);
+      chkMenu(db,[
+        {label:'Segna tutto da controllare',check:false,run:()=>{marks.setMany(id,allMarkKeys(e),true);renderArchive();}},
+        {label:'Segna tutto controllato',check:n===0,run:()=>{marks.clearEntry(id);renderArchive();}}
+      ]);
+    };
     it.onclick=()=>{
       if(moved){moved=false;return;}
       if(sw.classList.contains('open')){sw.classList.remove('open','drag');set(0,true);return;}
@@ -434,7 +504,7 @@ function showPreview(el,entry,report){
   q('.pv-s').onclick=async()=>{
     const g=q('.pv-g').value.trim();
     if(g)entry.gloss=g;
-    const sv=await saveUser(entry,{});const inSearch=el===$('out');el.innerHTML='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,report&&report.addPass?'pass':'act');}
+    const sv=await saveUser(entry,{});autoMark(sv,report);const inSearch=el===$('out');el.innerHTML='';$('pt').value='';$('pp').value='';toast('Salvato: '+entry.lemma);if(inSearch){const h=INDEX.get(keyOf(sv.forms[0]));if(h)show(h.e,report&&report.addPass?'pass':'act');}
   };
 }
 $('pgo').onclick=()=>{
@@ -489,7 +559,7 @@ $('bulk').onclick=async()=>{
             const dv=await tryDerive(t,fv&&fv.entry,false);
             if(dv){
               if(BYID.has(keyOf(dv.entry.forms[0]))){skipped++;}
-              else{await saveUser(dv.entry,{});DER++;}
+              else{autoMark(await saveUser(dv.entry,{}),dv.report);DER++;}
               bulkLog(done,skipped,t);continue;
             }
             if(ferr)throw ferr;
@@ -603,9 +673,10 @@ $('mf').onsubmit=async ev=>{
 
 /* ---------- esporta / importa ---------- */
 $('exp').onclick=()=>{
-  const bk=bulkState();
-  if(!USER.length&&!Object.keys(bk).length){toast('Non hai ancora dati tuoi da esportare');return;}
-  download('extra.json',store.toJson(USER,Object.keys(bk).length?{bulk:bk}:null));
+  const bk=bulkState(),ck=marks.toObject();
+  if(!USER.length&&!Object.keys(bk).length&&!Object.keys(ck).length){toast('Non hai ancora dati tuoi da esportare');return;}
+  const ex={};if(Object.keys(bk).length)ex.bulk=bk;if(Object.keys(ck).length)ex.chk=ck;
+  download('extra.json',store.toJson(USER,Object.keys(ex).length?ex:null));
 };
 $('imp').onchange=async ev=>{
   const f=ev.target.files[0];if(!f)return;
@@ -615,15 +686,17 @@ $('imp').onchange=async ev=>{
     for(const r of arr)await store.put(hydrate(r));
     const ib=store.bulkFromJson(txt);let nl=0;
     if(ib){const st=bulkState();for(const [l,x] of Object.entries(ib)){const o=st[l];if(!o||(x.complete&&!o.complete)){st[l]=x;nl++;}}bulkStore(st);bulkMarks();}
-    USER=(await store.getAll()).map(hydrate);rebuild();renderArchive();toast('Importati '+arr.length+' verbi'+(nl?' e lo stato di '+nl+' lettere':''));
+    const nc=marks.merge(marks.fromJson(txt));
+    USER=(await store.getAll()).map(hydrate);rebuild();renderArchive();toast('Importati '+arr.length+' verbi'+(nl?' e lo stato di '+nl+' lettere':'')+(nc?' e '+nc+' segni da controllare':''));
   }catch(err){toast('File non valido: '+err.message);}
   ev.target.value='';
 };
 $('clr').onclick=async()=>{
   if(!confirm('Cancellare tutti i verbi importati, inseriti o corretti da te su questo dispositivo?'))return;
-  await store.clearAll();USER=[];rebuild();renderArchive();$('out').innerHTML='';toast('Archivio personale svuotato');
+  await store.clearAll();marks.clearAll();USER=[];rebuild();renderArchive();$('out').innerHTML='';toast('Archivio personale svuotato');
 };
 $('afilter').oninput=renderArchive;
+$('achk').onclick=()=>{onlyChk=!onlyChk;renderArchive();};
 
 /* ---------- navigazione ---------- */
 const EXAMPLES=['γράφω','αγαπώ','θεωρώ','έρχομαι','κοιμάμαι','γεννιέμαι','ασχολούμαι','είμαι'];
