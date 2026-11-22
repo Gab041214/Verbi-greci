@@ -26,6 +26,7 @@
     <button type="button" role="menuitem" data-ovl="ov-manual">Aggiungi a mano</button>
     <button type="button" role="menuitem" data-ovl="ov-bulk">Importazione di massa da Wiktionary</button>
     <button type="button" role="menuitem" data-ovl="ov-paste">Incolla tabella Wiktionary</button>
+    <button type="button" role="menuitem" data-ovl="ov-tr">Traduzioni da rivedere</button>
   </div></div>
 </header>
 
@@ -62,6 +63,15 @@
     <progress id="bprog" value="0" max="1" hidden></progress><div id="blog" class="mute"></div>
     <div id="bprob" hidden><p class="warn">Verbi saltati (non salvati):</p><pre id="bprob-list" class="bprob"></pre><div class="row wrapbtn"><button type="button" id="bcopy" class="btn">Copia elenco</button><button type="button" id="bdiag" class="btn">Copia dettagli di alcuni verbi</button></div></div>
   <div class="row wrapbtn"><button type="button" class="btn" data-close>Chiudi</button></div></div></div>
+<div class="ovl" id="ov-tr" hidden><div class="pop" role="dialog" aria-modal="true" aria-label="Traduzioni da rivedere"><h3>Traduzioni da rivedere</h3>
+    <p class="mute" id="tr-n"></p>
+    <div class="row wrapbtn"><button type="button" id="tr-dl" class="btn">Scarica CSV</button><button type="button" id="tr-copy" class="btn">Copia per il foglio</button></div>
+    <hr class="trsep">
+    <p class="mute"><b>Importa il file corretto</b></p>
+    <div class="row wrapbtn"><label class="btn">Scegli file…<input id="tr-file" type="file" accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values" hidden></label><button type="button" id="tr-paste" class="btn">Incolla testo</button></div>
+    <textarea id="tr-ta" rows="6" class="full" placeholder="Incolla qui le righe del foglio" hidden spellcheck="false" autocapitalize="off"></textarea>
+    <div class="box" id="tr-sum" hidden><p class="trsum-t"><b id="tr-sum-t"></b></p><p class="mute trsum-l" id="tr-sum-l"></p></div>
+    <div class="row wrapbtn"><button type="button" id="tr-go" class="btn" disabled>Applica</button><button type="button" class="btn" data-close>Chiudi</button></div></div></div>
 <div class="ovl" id="ov-paste" hidden><div class="pop" role="dialog" aria-modal="true" aria-label="Incolla tabella Wiktionary"><h3>Incolla tabella Wiktionary</h3>
     <p class="mute">Se l'importazione diretta non funziona: apri la pagina del verbo su it/en.wiktionary, seleziona la tabella di coniugazione, copia e incolla qui.</p>
     <input id="pt" lang="el" placeholder="verbo (1ª sing.)" class="full"><textarea id="pp" rows="6" placeholder="Incolla qui…" class="full"></textarea>
