@@ -258,3 +258,9 @@ td.chk{width:44px;padding:0;text-align:right;vertical-align:middle}
 .cmenu .ck{font-weight:700}
 @keyframes cpop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.cmenu{animation:none}}
+
+/* ---------- traduzioni da rivedere ---------- */
+.gloss.gl-ver{color:var(--warn)}
+.trsep{border:0;border-top:1px solid var(--line);margin:14px 0}
+.trsum-t{margin:0 0 4px}.trsum-l{margin:0}
+#tr-ta{margin-top:10px}
