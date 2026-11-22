@@ -240,3 +240,21 @@ footer{display:flex;justify-content:center;padding-bottom:calc(8px + env(safe-ar
 .lbl{display:flex;flex-direction:column;gap:4px;font-size:.88rem;color:var(--mute);margin:10px 0}
 .lbl select{width:100%}
 .addpass{margin-bottom:12px}
+
+/* ---------- «da controllare» ---------- */
+td.chk{width:44px;padding:0;text-align:right;vertical-align:middle}
+.dotbtn{width:44px;height:36px;border:0;background:transparent;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:flex-end;cursor:pointer;color:inherit;box-shadow:none;min-height:0;-webkit-tap-highlight-color:transparent}
+.dotbtn i{display:block;width:11px;height:11px;border-radius:50%;background:transparent}
+.dotbtn.on i{background:var(--warn)}
+.chkrow{display:flex;justify-content:space-between;align-items:center}
+.item .rt{display:flex;align-items:center;gap:2px;flex:none}
+.item .dotbtn{width:40px;height:40px;margin:-6px -10px -6px 0}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;font:inherit;font-size:.92rem;border:1px solid var(--line);background:var(--card);color:var(--ink);white-space:nowrap;cursor:pointer}
+.chip i{width:10px;height:10px;border-radius:50%;background:var(--warn);display:inline-block}
+.chip.on{background:var(--warnbg);color:var(--warn);border-color:var(--warn);font-weight:700}
+.cscrim{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.18);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.cmenu{position:fixed;z-index:71;min-width:190px;padding:6px;border-radius:22px;background:var(--j-fill-strong);border:0.33px solid var(--j-ring);border-left-width:1px;border-right-width:1px;box-shadow:0 18px 48px rgba(20,20,40,.28);-webkit-backdrop-filter:blur(22px) saturate(1.7);backdrop-filter:blur(22px) saturate(1.7);transform-origin:top right;animation:cpop .16s ease-out}
+.cmenu button{display:flex;width:100%;justify-content:space-between;align-items:center;gap:14px;text-align:left;border:0;background:transparent;color:var(--ink);font:inherit;font-size:1rem;padding:12px 14px;border-radius:16px;cursor:pointer;min-height:0;box-shadow:none}
+.cmenu .ck{font-weight:700}
+@keyframes cpop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.cmenu{animation:none}}
