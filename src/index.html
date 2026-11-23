@@ -27,6 +27,7 @@
     <button type="button" role="menuitem" data-ovl="ov-bulk">Importazione di massa da Wiktionary</button>
     <button type="button" role="menuitem" data-ovl="ov-paste">Incolla tabella Wiktionary</button>
     <button type="button" role="menuitem" data-ovl="ov-tr">Traduzioni da rivedere</button>
+    <button type="button" role="menuitem" data-ovl="ov-ps">Cerca le voci passive mancanti</button>
   </div></div>
 </header>
 
@@ -61,7 +62,7 @@
     <label class="lbl">Lettera iniziale <select id="bletter"><option value="">Tutte</option><option value="α">α</option><option value="β">β</option><option value="γ">γ</option><option value="δ">δ</option><option value="ε">ε</option><option value="ζ">ζ</option><option value="η">η</option><option value="θ">θ</option><option value="ι">ι</option><option value="κ">κ</option><option value="λ">λ</option><option value="μ">μ</option><option value="ν">ν</option><option value="ξ">ξ</option><option value="ο">ο</option><option value="π">π</option><option value="ρ">ρ</option><option value="σ">σ</option><option value="τ">τ</option><option value="υ">υ</option><option value="φ">φ</option><option value="χ">χ</option><option value="ψ">ψ</option><option value="ω">ω</option></select></label><p id="binfo" class="mute" hidden></p>
     <div class="row wrapbtn"><button type="button" id="bulk" class="btn">Avvia</button><button type="button" id="bulkstop" class="btn" disabled>Ferma</button></div>
     <progress id="bprog" value="0" max="1" hidden></progress><div id="blog" class="mute"></div>
-    <div id="bprob" hidden><p class="warn">Verbi saltati (non salvati):</p><pre id="bprob-list" class="bprob"></pre><div class="row wrapbtn"><button type="button" id="bcopy" class="btn">Copia elenco</button><button type="button" id="bdiag" class="btn">Copia dettagli di alcuni verbi</button></div></div>
+    <div id="bprob" hidden><p class="warn">Verbi saltati (non salvati):</p><pre id="bprob-list" class="bprob"></pre><div class="row wrapbtn"><button type="button" id="brules" class="btn pri" hidden>Importa con le regole</button><button type="button" id="bcopy" class="btn">Copia elenco</button><button type="button" id="bdiag" class="btn">Copia dettagli di alcuni verbi</button></div></div>
   <div class="row wrapbtn"><button type="button" class="btn" data-close>Chiudi</button></div></div></div>
 <div class="ovl" id="ov-tr" hidden><div class="pop" role="dialog" aria-modal="true" aria-label="Traduzioni da rivedere"><h3>Traduzioni da rivedere</h3>
     <p class="mute" id="tr-n"></p>
@@ -72,6 +73,17 @@
     <textarea id="tr-ta" rows="6" class="full" placeholder="Incolla qui le righe del foglio" hidden spellcheck="false" autocapitalize="off"></textarea>
     <div class="box" id="tr-sum" hidden><p class="trsum-t"><b id="tr-sum-t"></b></p><p class="mute trsum-l" id="tr-sum-l"></p></div>
     <div class="row wrapbtn"><button type="button" id="tr-go" class="btn" disabled>Applica</button><button type="button" class="btn" data-close>Chiudi</button></div></div></div>
+<div class="ovl" id="ov-ps" hidden><div class="pop" role="dialog" aria-modal="true" aria-label="Voci passive mancanti"><h3>Voci passive mancanti</h3>
+    <p class="mute" id="ps-n"></p>
+    <div class="row wrapbtn"><button type="button" id="ps-go" class="btn">Cerca su Wiktionary</button><button type="button" id="ps-stop" class="btn" disabled>Ferma</button></div>
+    <progress id="ps-prog" value="0" max="1" hidden></progress><div id="ps-log" class="mute"></div>
+    <div id="ps-list" class="rllist"></div>
+    <div class="row wrapbtn"><button type="button" id="ps-add" class="btn pri" disabled>Aggiungi le selezionate</button><button type="button" class="btn" data-close>Chiudi</button></div></div></div>
+<div class="ovl" id="ov-rl" hidden><div class="pop" role="dialog" aria-modal="true" aria-label="Importa con le regole"><h3>Importa con le regole</h3>
+    <p class="mute">Verbi regolari senza tabella su Wiktionary: le forme sono calcolate con le regole e l'aoristo ha il pallino «da controllare». Togli la spunta ai verbi che non vuoi salvare.</p>
+    <progress id="rl-prog" value="0" max="1" hidden></progress><div id="rl-log" class="mute"></div>
+    <div id="rl-list" class="rllist"></div>
+    <div class="row wrapbtn"><button type="button" id="rl-go" class="btn pri" disabled>Salva le selezionate</button><button type="button" class="btn" data-close>Chiudi</button></div></div></div>
 <div class="ovl" id="ov-paste" hidden><div class="pop" role="dialog" aria-modal="true" aria-label="Incolla tabella Wiktionary"><h3>Incolla tabella Wiktionary</h3>
     <p class="mute">Se l'importazione diretta non funziona: apri la pagina del verbo su it/en.wiktionary, seleziona la tabella di coniugazione, copia e incolla qui.</p>
     <input id="pt" lang="el" placeholder="verbo (1ª sing.)" class="full"><textarea id="pp" rows="6" placeholder="Incolla qui…" class="full"></textarea>
