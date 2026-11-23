@@ -4,6 +4,7 @@ import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
 import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktionary.js';
 import {fromHeadword} from './headword.js';
+import {isPassTitle,activeCandidates,passiveCandidates,lacksPassive,withPassive,withoutPassive,hasPassive} from './passive.js';
 import {splitPrefix,deriveEntry} from './derive.js';
 import {initClearable} from './clearable.js';
 import * as marks from './marks.js';
@@ -142,12 +143,14 @@ function show(e,voice){
   current=e;
   const actions=`<button type="button" class="btn" data-a="edit">Correggi forme</button>`+
     (e.guessed?'':`<button type="button" class="btn" data-a="gloss">Correggi traduzione</button>`)+
+    (!e.guessed&&lacksPassive(e)?`<button type="button" class="btn" data-a="addps">Aggiungi voce passiva</button>`:'')+
     (e.guessed?`<button type="button" class="btn" data-a="paste">Incolla tabella</button><button type="button" class="btn pri" data-a="save">Salva nell'archivio</button>`:'');
   renderEntry($('out'),e,voice,{actions,onVoice:v=>{show.voice=v;}});
   $('out').onclick=ev=>{
     const a=ev.target.dataset&&ev.target.dataset.a;if(!a)return;
     if(a==='edit')openEditor(e,show.voice||voice);
     if(a==='gloss')openGloss(e,ev.target);
+    if(a==='addps'){const p=passiveCandidates(e.forms[0],e.cls)[0];if(p)addPassive(e,p);else toast('Non riesco a calcolare la voce passiva');}
     if(a==='paste'){openOvl('ov-paste',ev.target);$('pt').value=e.lemma;}
     if(a==='save')saveUser(e,{source:'manual'}).then(()=>{toast('Salvato');search(e.lemma);});
   };
@@ -223,17 +226,36 @@ function passiveOffer(e,q){
   $('addpass').onclick=()=>addPassive(e,q);
 }
 function addPassive(e,q){
-  let g=null,pv=null;
-  try{g=guessEntry(q);pv=g&&conjugate(g).find(v=>v.id==='pass');}catch(_){}
-  if(!pv){toast('Non riesco a calcolare la voce passiva');return;}
-  const r=pv.raw,ne=hydrate({...e,O:JSON.parse(JSON.stringify(e.O||{}))});
-  ne.O.ppres=r.pres;ne.O.pimpf=r.impf;
-  if(r.aor)ne.O.paor=r.aor;
-  if(r.subj)ne.O.psubj=r.subj;
-  if(r.iaor)ne.O.piaor=r.iaor;
-  if(!ne.source||ne.source==='base'||ne.source==='extra')ne.source=e.source||'manual';
+  const ne=withPassive(e,q);
+  if(!ne){toast('Non riesco a calcolare la voce passiva');return;}
   ne.edited=true;
   showPreview($('out'),finalizeEntry(ne),{found:[],missing:[],addPass:{form:q,lemma:e.lemma}});
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* pagina della forma passiva su Wiktionary: {kind:'table'} se ha la tabella completa, {kind:'rules'} se no; null se la pagina non c'è */
+async function passiveSource(p){
+  try{
+    const fv=await fetchVerb(p);
+    if(fv&&!fv.report.redirect&&!fv.entry.fromHeadword&&!(fv.report.missing&&fv.report.missing.length)&&!(fv.report.repairs&&fv.report.repairs.length))return {kind:'table',entry:finalizeEntry(fv.entry)};
+    return {kind:'rules'};
+  }catch(_){return null;}
+}
+/* cerca su Wiktionary la forma passiva di un verbo attivo */
+async function lookupPassive(e){
+  for(const p of passiveCandidates(e.forms[0],e.cls)){
+    const pre=await passiveSource(p);
+    if(pre)return {pform:p,pre};
+    await sleep(150);
+  }
+  return null;
+}
+/* aggiunge e salva la voce passiva: dalla tabella se c'è, altrimenti con le regole e il pallino «da controllare» sull'aoristo */
+async function attachPassive(e,pform,pre){
+  const ne=withPassive(e,pform,pre&&pre.kind==='table'?pre.entry:null);
+  if(!ne)return null;
+  const saved=await saveUser(ne,{});
+  if(!(pre&&pre.kind==='table'))autoMark(saved,{addPass:{form:pform,lemma:e.lemma}});
+  return saved;
 }
 async function pickLemma(l,voice,q,el=$('out')){
   const hit=INDEX.get(keyOf(l));
@@ -592,59 +614,96 @@ function bulkMarks(){
 }
 $('bletter').onchange=()=>{bulkCont=null;const x=bulkState()[$('bletter').value];PROB.length=0;if(x)PROB.push(...(x.problems||[]));bulkProblems();bulkMarks();};
 setTimeout(bulkMarks,0);
-let ALT=0,DER=0;
-const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · forme alternative ${ALT} · derivati ${DER} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
+let ALT=0,DER=0,PASSN=0,bulkPend=[],bulkNeed=[],bulkSeen=new Set();
+const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · passive aggiunte ${PASSN} · in attesa ${bulkPend.length} · forme alternative ${ALT} · derivati ${DER} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
 function bulkProblems(){
   $('bprob').hidden=!PROB.length;
   $('bprob-list').textContent=PROB.map(p=>p.t+' — '+p.why).join('\n');
+  const n=rulesEligible().length;$('brules').hidden=!n;$('brules').textContent='Importa con le regole ('+n+')';
+}
+/* forma passiva trovata (χορεύομαι): la aggiungo al verbo attivo che è già nell'archivio. 'defer' = l'attivo non c'è ancora, riprovo alla fine */
+async function bulkPassive(t,final){
+  for(const c of activeCandidates(t)){
+    const h=INDEX.get(keyOf(c));if(!h)continue;
+    if(!lacksPassive(h.e))return 'have';
+    const pre=(await passiveSource(t))||{kind:'rules'};
+    return (await attachPassive(h.e,t,pre))?'done':'none';
+  }
+  return final?'none':'defer';
 }
 $('bulk').onclick=async()=>{
   stopBulk=false;$('bulk').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
-  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;DER=0;}bulkProblems();
+  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;DER=0;PASSN=0;bulkPend=[];bulkNeed=[];bulkSeen=new Set();}bulkProblems();
+  /* un verbo: restituisce 'q' se non ha usato la rete */
+  const one=async(t,final)=>{
+    if(!final)bulkSeen.add(keyOf(t));
+    if(BYID.has(keyOf(t))||INDEX.has(keyOf(t))){skipped++;return 'q';}
+    if(isPassTitle(t)){
+      const r=await bulkPassive(t,final);
+      if(r==='done'){PASSN++;return;}
+      if(r==='have'){skipped++;return 'q';}
+      if(r==='defer'){bulkPend.push(t);return 'q';}
+      if(final&&activeCandidates(t).some(c=>bulkSeen.has(keyOf(c)))){PROB.push({t,why:'verbo attivo non in archivio: importalo e usa «Cerca le voci passive mancanti»'});bulkProblems();return 'q';}
+    }
+    try{
+      /* in blocco nessuno controlla le forme: si salvano solo verbi con la tabella letta per intero */
+      let fv=null,ferr=null;
+      try{fv=await fetchVerb(t);}catch(err){ferr=err;}
+      if(fv&&fv.report.redirect){ALT++;return;}
+      if(!fv||fv.entry.fromHeadword){
+        const dv=await tryDerive(t,fv&&fv.entry,false);
+        if(dv){
+          if(BYID.has(keyOf(dv.entry.forms[0]))){skipped++;}
+          else{const sv=await saveUser(dv.entry,{});autoMark(sv,dv.report);DER++;if(lacksPassive(sv))bulkNeed.push(keyOf(sv.forms[0]));}
+          return;
+        }
+        if(ferr)throw ferr;
+      }
+      const {entry,report}=fv;
+      const why=entry.fromHeadword?'pagina senza tabella di coniugazione'
+        :(report.missing&&report.missing.length)?'tabella incompleta ('+report.missing.join(', ')+')'
+        :(report.repairs&&report.repairs.length)?'forme con caratteri non greci ('+report.repairs.join('; ')+')':'';
+      if(why){PROB.push({t,why});bulkProblems();}
+      else{const sv=await saveUser(entry,{});done++;if(lacksPassive(sv))bulkNeed.push(keyOf(sv.forms[0]));}
+    }catch(err){PROB.push({t,why:'non letta: '+(err&&err.message||'errore')});bulkProblems();}
+  };
   try{
     do{
       const L=$('bletter').value;
       let {titles,next}=await listVerbs(bulkCont);
       bulkCont=next;
       if(L)titles=titles.filter(t=>keyOf(t).startsWith(L));
-      /* le forme passive (-μαι) per ultime: così, se il verbo attivo viene importato in questa stessa pagina, la sua voce passiva c'è già */
-      titles=[...titles.filter(t=>!/μαι$/.test(t)),...titles.filter(t=>/μαι$/.test(t))];
+      /* le forme passive (-μαι) per ultime: così, se il verbo attivo viene importato in questa stessa pagina, la sua voce passiva trova già l'attivo */
+      titles=[...titles.filter(t=>!isPassTitle(t)),...titles.filter(t=>isPassTitle(t))];
       $('bprog').max=Math.max(titles.length,1);
       let i=0;
       for(const t of titles){
         if(stopBulk)break;
         i++;$('bprog').value=i;
-        if(BYID.has(keyOf(t))||INDEX.has(keyOf(t))){skipped++;continue;}
-        try{
-          /* in blocco nessuno controlla le forme: si salvano solo verbi con la tabella letta per intero */
-          let fv=null,ferr=null;
-          try{fv=await fetchVerb(t);}catch(err){ferr=err;}
-          if(fv&&fv.report.redirect){ALT++;bulkLog(done,skipped,t);continue;}
-          if(!fv||fv.entry.fromHeadword){
-            const dv=await tryDerive(t,fv&&fv.entry,false);
-            if(dv){
-              if(BYID.has(keyOf(dv.entry.forms[0]))){skipped++;}
-              else{autoMark(await saveUser(dv.entry,{}),dv.report);DER++;}
-              bulkLog(done,skipped,t);continue;
-            }
-            if(ferr)throw ferr;
-          }
-          const {entry,report}=fv;
-          const why=entry.fromHeadword?'pagina senza tabella di coniugazione'
-            :(report.missing&&report.missing.length)?'tabella incompleta ('+report.missing.join(', ')+')'
-            :(report.repairs&&report.repairs.length)?'forme con caratteri non greci ('+report.repairs.join('; ')+')':'';
-          if(why){PROB.push({t,why});bulkProblems();}
-          else{await saveUser(entry,{});done++;}
-        }catch(err){PROB.push({t,why:'non letta: '+(err&&err.message||'errore')});bulkProblems();}
+        const q=await one(t,false);
         bulkLog(done,skipped,t);
-        await new Promise(r=>setTimeout(r,150));
+        if(q!=='q')await sleep(150);
       }
     }while(bulkCont&&!stopBulk);
+    if(!bulkCont&&!stopBulk){
+      /* passata finale: passive rimaste in attesa e verbi senza voce passiva (cerco la loro forma in -ομαι su Wiktionary) */
+      $('bprog').max=Math.max(bulkPend.length+bulkNeed.length,1);$('bprog').value=0;let j=0;
+      while(bulkPend.length&&!stopBulk){const t=bulkPend.shift();$('bprog').value=++j;const q=await one(t,true);bulkLog(done,skipped,t);if(q!=='q')await sleep(150);}
+      while(bulkNeed.length&&!stopBulk){
+        const k=bulkNeed.shift();$('bprog').value=++j;
+        const e=BYID.get(k);if(!e||!lacksPassive(e))continue;
+        if(passiveCandidates(e.forms[0],e.cls).some(p=>bulkSeen.has(keyOf(p))))continue;   // la sua forma passiva è già passata dall'elenco
+        const r=await lookupPassive(e);
+        if(r&&await attachPassive(e,r.pform,r.pre))PASSN++;
+        bulkLog(done,skipped,e.lemma);
+      }
+    }
   }catch(err){$('blog').textContent='Interrotto: '+err.message;}
   $('bulk').disabled=false;$('bulkstop').disabled=true;
   if(L0){const st=bulkState(),old=st[L0]||{saved:0};st[L0]={complete:!bulkCont&&!stopBulk,saved:(old.saved||0)+done,problems:PROB.map(p=>({...p})),date:new Date().toLocaleDateString('it-IT')};bulkStore(st);bulkMarks();}
   bulkLog(done,skipped);
-  $('blog').textContent+=bulkCont?' (ripresa possibile)':' — fine elenco';
+  $('blog').textContent+=bulkCont?' (ripresa possibile)':(bulkPend.length||bulkNeed.length)?' (passate finali interrotte)':' — fine elenco';
+  renderArchive&&renderArchive();
 };
 /* campione di verbi saltati: per ogni tipo di problema, uno non in -ομαι e uno in -ομαι (o i primi due) */
 function bulkSample(){
@@ -670,6 +729,106 @@ $('bdiag').onclick=async()=>{
 };
 $('bcopy').onclick=async()=>{const t=PROB.map(p=>p.t+'\t'+String(p.why).replace(/[\t\r\n]+/g,' ')).join('\n');try{await navigator.clipboard.writeText(t);toast('Elenco copiato');}catch(_){const r=document.createRange();r.selectNodeContents($('bprob-list'));const s2=getSelection();s2.removeAllRanges();s2.addRange(r);toast('Seleziona e copia');}};
 $('bulkstop').onclick=()=>{stopBulk=true;};
+
+/* ---------- importa con le regole (verbi regolari senza tabella) ---------- */
+const RULES_END=/(ίζω|ώνω|εύω|άζω)$/;
+function rulesEligible(){return PROB.filter(p=>/^pagina senza tabella/.test(p.why)&&!isPassTitle(p.t)&&RULES_END.test(p.t)&&!INDEX.has(keyOf(p.t)));}
+const aorOf=(e,voice)=>{try{const v=conjugate(e).find(x=>x.id===voice);const c=v&&[].concat(...Object.values(v.cards)).find(x=>x.id==='aor');return c&&c.forms?c.forms[0]:'';}catch(_){return '';}};
+let rlRows=[],rlBusy=false;
+async function rlOpen(){
+  openOvl('ov-rl',$('brules'));
+  if(rlBusy)return;rlBusy=true;
+  const todo=rulesEligible().map(p=>p.t),listed=new Set(PROB.map(p=>keyOf(p.t)));
+  rlRows=[];$('rl-list').innerHTML='';$('rl-go').disabled=true;$('rl-log').textContent='';$('rl-prog').hidden=false;$('rl-prog').max=Math.max(todo.length,1);
+  let i=0;
+  for(const t of todo){
+    $('rl-prog').value=++i;$('rl-log').textContent='Leggo '+t+'…';
+    try{
+      const fv=await fetchVerb(t);
+      if(!fv.entry.fromHeadword)throw new Error('ora la pagina ha una tabella: importala dalla ricerca');
+      const r=fromHeadword(fv.entry);
+      const ent=finalizeEntry(r.entry);
+      const pf=passiveCandidates(t,ent.cls)[0];
+      /* le regole danno di norma anche la passiva: preparo le due varianti, con e senza */
+      const withP=hasPassive(ent)?ent:(pf?withPassive(ent,pf):null);
+      const noP=withP?withoutPassive(withP):ent;
+      /* la passiva è preselezionata se la sua forma compare nell'elenco di Wiktionary (cioè esiste una pagina in -ομαι) */
+      const pre=!!withP&&passiveCandidates(t,ent.cls).some(x=>listed.has(keyOf(x)));
+      rlRows.push({t,withP,noP,pre,aor:aorOf(noP,'act'),paor:withP?aorOf(withP,'pass'):'',disp:noP.display,gloss:noP.gloss,cls:noP.cls});
+    }catch(err){rlRows.push({t,err:err&&err.message||'errore'});}
+    renderRl();await sleep(150);
+  }
+  $('rl-prog').hidden=true;$('rl-log').textContent=rlRows.filter(x=>x.noP).length+' verbi pronti';
+  rlBusy=false;renderRl();
+}
+function renderRl(){
+  $('rl-list').innerHTML=rlRows.map((r,i)=>r.err
+    ?`<div class="rlrow bad"><span><b lang="el">${esc(r.t)}</b><em>non preparato: ${esc(r.err)}</em></span></div>`
+    :`<div class="rlrow"><label><input type="checkbox" data-i="${i}" data-k="v" checked><span><b lang="el">${esc(r.disp)}</b> ${esc(r.gloss||'')}<em>aoristo <span lang="el">${esc(r.aor)}</span> · ${esc(CLASS_DESC[r.cls]||r.cls)}</em></span></label>${r.withP?`<label class="rlps"><input type="checkbox" data-i="${i}" data-k="p"${r.pre?' checked':''}><span>con voce passiva <span lang="el">${esc(r.paor)}</span></span></label>`:''}</div>`).join('');
+  $('rl-go').disabled=rlBusy||!rlRows.some(r=>r.noP);
+}
+async function rlSave(){
+  let n=0,np=0;
+  for(const [i,r] of rlRows.entries()){
+    if(!r.noP)continue;
+    const on=$('rl-list').querySelector(`input[data-i="${i}"][data-k="v"]`);
+    if(!on||!on.checked)continue;
+    const wp=$('rl-list').querySelector(`input[data-i="${i}"][data-k="p"]`);
+    const ne=wp&&wp.checked&&r.withP?r.withP:r.noP;
+    if(BYID.has(keyOf(ne.forms[0])))continue;
+    const sv=await saveUser(ne,{});autoMark(sv,{noTable:true});n++;if(ne===r.withP){np++;passiveCandidates(r.t,ne.cls).forEach(x=>{const j=PROB.findIndex(p=>p.t===x);if(j>=0)PROB.splice(j,1);});}
+    const k=PROB.findIndex(p=>p.t===r.t);if(k>=0)PROB.splice(k,1);
+  }
+  const L=$('bletter').value,st=bulkState();if(L&&st[L]){st[L].problems=PROB.map(p=>({...p}));bulkStore(st);}
+  bulkProblems();bulkMarks();renderArchive();
+  openOvl('ov-bulk',$('brules'));
+  toast(n+(n===1?' verbo salvato':' verbi salvati')+(np?' · '+np+' con voce passiva':''));
+}
+$('brules').onclick=rlOpen;
+$('rl-go').onclick=rlSave;
+
+/* ---------- cerca le voci passive mancanti ---------- */
+let psFound=[],psStop=false,psBusy=false;
+function psRefresh(){
+  if(psBusy)return;
+  const n=USER.filter(lacksPassive).length;
+  $('ps-n').textContent=n?n+(n===1?' verbo del tuo archivio non ha':' verbi del tuo archivio non hanno')+' la voce passiva. Cerco su Wiktionary se esiste la forma in -ομαι.':'Tutti i verbi del tuo archivio hanno già la voce passiva, o non la possono avere.';
+  $('ps-go').disabled=!n;$('ps-add').disabled=true;$('ps-list').innerHTML='';$('ps-log').textContent='';psFound=[];
+}
+function renderPs(){
+  $('ps-list').innerHTML=psFound.map((r,i)=>`<div class="rlrow"><label><input type="checkbox" data-i="${i}" checked><span><b lang="el">${esc(r.e.display)}</b> → <b lang="el">${esc(r.pform)}</b><em>${r.pre.kind==='table'?'tabella di Wiktionary':'calcolata con le regole · aoristo da controllare'}</em></span></label></div>`).join('');
+  $('ps-add').disabled=psBusy||!psFound.length;
+}
+async function psRun(){
+  psBusy=true;psStop=false;psFound=[];renderPs();
+  $('ps-go').disabled=true;$('ps-stop').disabled=false;$('ps-prog').hidden=false;
+  const todo=USER.filter(lacksPassive);$('ps-prog').max=Math.max(todo.length,1);
+  let i=0;
+  for(const e of todo){
+    if(psStop)break;
+    $('ps-prog').value=++i;$('ps-log').textContent=i+' / '+todo.length+' · '+e.lemma+' · trovate '+psFound.length;
+    const r=await lookupPassive(e);
+    if(r){psFound.push({e,...r});renderPs();}
+  }
+  psBusy=false;$('ps-stop').disabled=true;$('ps-prog').hidden=true;$('ps-go').disabled=false;
+  $('ps-log').textContent=(psStop?'Fermata · ':'')+'Voci passive trovate: '+psFound.length+' su '+todo.length+' verbi controllati';
+  renderPs();
+}
+async function psAdd(){
+  let n=0;
+  for(const [i,r] of psFound.entries()){
+    const cb=$('ps-list').querySelector(`input[data-i="${i}"]`);if(!cb||!cb.checked)continue;
+    const e=BYID.get(keyOf(r.e.forms[0]));if(!e||!lacksPassive(e))continue;
+    if(await attachPassive(e,r.pform,r.pre))n++;
+  }
+  ovlClose();renderArchive();
+  toast(n+(n===1?' voce passiva aggiunta':' voci passive aggiunte'));
+}
+function psInit(){
+  document.querySelector('[data-ovl="ov-ps"]').addEventListener('click',psRefresh);
+  $('ps-go').onclick=psRun;$('ps-stop').onclick=()=>{psStop=true;};$('ps-add').onclick=psAdd;
+}
+
 
 /* ---------- inserimento manuale ---------- */
 $('m-c').innerHTML=Object.entries(CLASS_DESC).map(([k,v])=>`<option value="${k}">${k} — ${esc(v)}</option>`).join('');
@@ -779,7 +938,7 @@ $('q-clear').onclick=()=>{const q=$('q');q.value='';q.dispatchEvent(new Event('i
 $('f').addEventListener('submit',ev=>{ev.preventDefault();search($('q').value);});
 $('q').addEventListener('input',()=>suggest($('q').value));
 
-initClearable();
+initClearable();psInit();
 trInit();
 loadAll().then(()=>{window.__ready=true;});
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
