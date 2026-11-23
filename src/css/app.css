@@ -264,3 +264,12 @@ td.chk{width:44px;padding:0;text-align:right;vertical-align:middle}
 .trsep{border:0;border-top:1px solid var(--line);margin:14px 0}
 .trsum-t{margin:0 0 4px}.trsum-l{margin:0}
 #tr-ta{margin-top:10px}
+
+/* ---------- passive mancanti e importazione con le regole ---------- */
+.rllist{max-height:46vh;overflow:auto;margin:10px 0}
+.rlrow{padding:9px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+.rlrow label{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+.rlrow input[type=checkbox]{width:24px;height:24px;flex:none;margin:1px 0 0;padding:0;min-height:0;border:0;background:none;box-shadow:none;-webkit-appearance:auto;appearance:auto;accent-color:var(--warn)}
+.rlrow em{display:block;font-style:normal;color:var(--mute);font-size:.85rem;margin-top:2px}
+.rlrow .rlps{margin:8px 0 0 34px;font-size:.9rem;color:var(--mute)}
+.rlrow.bad{color:var(--mute)}
