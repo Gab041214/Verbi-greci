@@ -48,3 +48,21 @@ test('traduzione della voce passiva: esportata e reimportata',()=>{
   const back=fromJson(toJson([e]))[0];
   assert.equal(back.gloss_p,'essere scritto');
 });
+
+test('varianti dell\'aoristo: congiuntivo, futuro e imperativo le seguono', () => {
+  const g=finalizeEntry(guessEntry('ζουλάω'));
+  g.O.aor=['ζούλησα / ζούληξα','ζούλησες / ζούληξες','ζούλησε / ζούληξε','ζουλήσαμε / ζουλήξαμε','ζουλήσατε / ζουλήξατε','ζούλησαν(ε) / ζούληξαν(ε)'];
+  g.O.paor=['ζουλήχτηκα / ζουλήθηκα','ζουλήχτηκες / ζουλήθηκες','ζουλήχτηκε / ζουλήθηκε','ζουληχτήκαμε / ζουληθήκαμε','ζουληχτήκατε / ζουληθήκατε','ζουλήχτηκαν / ζουλήθηκαν'];
+  const vs=conjugate(finalizeEntry(g));
+  const card=(v,id)=>[].concat(...Object.values(v.cards)).find(c=>c.id===id);
+  const a=vs.find(v=>v.id==='act'),p=vs.find(v=>v.id==='pass');
+  assert.equal(card(a,'saor').forms[0],'να ζουλήσω / να ζουλήξω');
+  assert.equal(card(a,'fut2').forms[3],'θα ζουλήσουμε / θα ζουλήξουμε');
+  assert.deepEqual(card(a,'iaor').forms,['ζούλησε / ζούληξε','ζουλήστε / ζουλήξτε']);
+  assert.equal(card(p,'saor').forms[0],'να ζουληχτώ / να ζουληθώ');
+});
+test('senza varianti nulla cambia', () => {
+  const g=finalizeEntry(guessEntry('ζουλάω'));
+  const a=conjugate(g).find(v=>v.id==='act');
+  assert.equal([].concat(...Object.values(a.cards)).find(c=>c.id==='saor').forms[0],'να ζουλήσω');
+});
