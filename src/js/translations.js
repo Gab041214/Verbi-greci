@@ -3,13 +3,13 @@
 export const HEAD=['verbo','inglese','italiano','voce passiva','italiano passivo'];
 
 /* verbi dell'utente la cui traduzione è ancora quella inglese di Wiktionary */
-export const needsReview=e=>!!e&&e._origin==='user'&&!!e.gloss_en&&e.gloss===e.gloss_en;
+export const needsReview=e=>!!e&&e._origin==='user'&&((!!e.gloss_en&&e.gloss===e.gloss_en)||!String(e.gloss||'').trim());
 
 /* una riga per verbo; passLemma(e) dà la forma passiva (o '') */
 export function buildRows(list,passLemma){
   return list.filter(needsReview)
     .sort((a,b)=>String(a.lemma).localeCompare(String(b.lemma),'el'))
-    .map(e=>[e.lemma,e.gloss_en,'',(passLemma&&passLemma(e))||'','']);
+    .map(e=>[e.lemma,e.gloss_en||'','',(passLemma&&passLemma(e))||'','']);
 }
 
 const csvCell=s=>{s=String(s??'');return /[;"\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};

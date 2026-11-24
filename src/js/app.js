@@ -4,6 +4,7 @@ import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
 import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktionary.js';
 import {fromHeadword} from './headword.js';
+import {fetchVerbFull,fetchElEntry} from './elwikt.js';
 import {isPassTitle,activeCandidates,passiveCandidates,lacksPassive,withPassive,withoutPassive,hasPassive} from './passive.js';
 import {splitPrefix,deriveEntry} from './derive.js';
 import {initClearable} from './clearable.js';
@@ -84,7 +85,7 @@ function allMarkKeys(e){
 }
 /* verbi ricavati o calcolati con le regole: segna da subito le forme più incerte (aoristo e derivati) */
 function autoMark(saved,report){
-  if(!saved||!report||!(report.derived||report.addPass||report.noTable))return;
+  if(!saved||!report||!(report.derived||report.addPass||report.noTable||report.el))return;
   const id=keyOf(saved.forms[0]),voices=report.addPass?['pass']:['act','pass'];
   const keys=[];
   for(const v of safeConj(saved)||[]){
@@ -212,6 +213,8 @@ async function tryDerive(title,wik,web=true){
   return {entry:d,report:{found:[],missing:[],derived:{extra,from:base.lemma,prefix:sp.prefix,noPass:/ομαι$/.test(title)&&!d.O.ppres&&!d.cls.startsWith('D')}}};
 }
 async function resolveHeadword(el,entry){
+  const ev=await fetchElEntry(entry.forms[0]);
+  if(ev){const g=entry.gloss_en||entry.gloss;if(g){ev.entry.gloss=g;ev.entry.gloss_en=g;}showPreview(el,ev.entry,ev.report);return;}
   const dv=await tryDerive(entry.forms[0],entry);
   if(dv){showPreview(el,dv.entry,dv.report);return;}
   const done=cls=>{const r=fromHeadword(entry,cls);showPreview(el,r.entry,{found:[],missing:[],noTable:true,notes:r.notes});};
@@ -235,7 +238,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 /* pagina della forma passiva su Wiktionary: {kind:'table'} se ha la tabella completa, {kind:'rules'} se no; null se la pagina non c'è */
 async function passiveSource(p){
   try{
-    const fv=await fetchVerb(p);
+    const fv=await fetchVerbFull(p);
     if(fv&&!fv.report.redirect&&!fv.entry.fromHeadword&&!(fv.report.missing&&fv.report.missing.length)&&!(fv.report.repairs&&fv.report.repairs.length))return {kind:'table',entry:finalizeEntry(fv.entry)};
     return {kind:'rules'};
   }catch(_){return null;}
@@ -562,7 +565,8 @@ function reportHtml(r){
   const miss=(r.missing||[]);
   const rd=r.redirect?`<p class="ok">«${esc(r.redirect.from)}» rimanda a «${esc(r.redirect.to)}»: ecco la coniugazione di ${esc(r.redirect.to)}.</p>`:'';
   const rep=rd+((r.repairs&&r.repairs.length)?`<p class="warn">Forme corrette per caratteri non greci (controllale): ${esc(r.repairs.join('; '))}</p>`:'');
-  return rep+(miss.length?`<p class="warn">Dati non trovati nella tabella (verranno calcolati con le regole): ${esc(miss.join(', '))}</p>`:'<p class="ok">Tabella letta completamente.</p>');
+  const elN=r.el?'<p class="warn">Tabella letta dalla Wiktionary greca: la traduzione è quella inglese, sostituiscila con l\'italiano. L\'aoristo ha il pallino «da controllare».</p>':'';
+  return rep+elN+(miss.length?`<p class="warn">Dati non trovati nella tabella (verranno calcolati con le regole): ${esc(miss.join(', '))}</p>`:'<p class="ok">Tabella letta completamente.</p>');
 }
 function rescue(el,verb){
   const v=(verb||'').trim();
@@ -614,8 +618,8 @@ function bulkMarks(){
 }
 $('bletter').onchange=()=>{bulkCont=null;const x=bulkState()[$('bletter').value];PROB.length=0;if(x)PROB.push(...(x.problems||[]));bulkProblems();bulkMarks();};
 setTimeout(bulkMarks,0);
-let ALT=0,DER=0,PASSN=0,bulkPend=[],bulkNeed=[],bulkSeen=new Set();
-const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · passive aggiunte ${PASSN} · in attesa ${bulkPend.length} · forme alternative ${ALT} · derivati ${DER} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
+let ALT=0,DER=0,EL=0,PASSN=0,bulkPend=[],bulkNeed=[],bulkSeen=new Set();
+const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · passive aggiunte ${PASSN} · da Wiktionary greca ${EL} · in attesa ${bulkPend.length} · forme alternative ${ALT} · derivati ${DER} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
 function bulkProblems(){
   $('bprob').hidden=!PROB.length;
   $('bprob-list').textContent=PROB.map(p=>p.t+' — '+p.why).join('\n');
@@ -633,7 +637,7 @@ async function bulkPassive(t,final){
 }
 $('bulk').onclick=async()=>{
   stopBulk=false;$('bulk').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
-  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;DER=0;PASSN=0;bulkPend=[];bulkNeed=[];bulkSeen=new Set();}bulkProblems();
+  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;DER=0;PASSN=0;EL=0;bulkPend=[];bulkNeed=[];bulkSeen=new Set();}bulkProblems();
   /* un verbo: restituisce 'q' se non ha usato la rete */
   const one=async(t,final)=>{
     if(!final)bulkSeen.add(keyOf(t));
@@ -648,7 +652,7 @@ $('bulk').onclick=async()=>{
     try{
       /* in blocco nessuno controlla le forme: si salvano solo verbi con la tabella letta per intero */
       let fv=null,ferr=null;
-      try{fv=await fetchVerb(t);}catch(err){ferr=err;}
+      try{fv=await fetchVerbFull(t);}catch(err){ferr=err;}
       if(fv&&fv.report.redirect){ALT++;return;}
       if(!fv||fv.entry.fromHeadword){
         const dv=await tryDerive(t,fv&&fv.entry,false);
@@ -664,7 +668,7 @@ $('bulk').onclick=async()=>{
         :(report.missing&&report.missing.length)?'tabella incompleta ('+report.missing.join(', ')+')'
         :(report.repairs&&report.repairs.length)?'forme con caratteri non greci ('+report.repairs.join('; ')+')':'';
       if(why){PROB.push({t,why});bulkProblems();}
-      else{const sv=await saveUser(entry,{});done++;if(lacksPassive(sv))bulkNeed.push(keyOf(sv.forms[0]));}
+      else{const sv=await saveUser(entry,{});autoMark(sv,report);done++;if(report.el)EL++;if(lacksPassive(sv))bulkNeed.push(keyOf(sv.forms[0]));}
     }catch(err){PROB.push({t,why:'non letta: '+(err&&err.message||'errore')});bulkProblems();}
   };
   try{
