@@ -14,7 +14,7 @@ const jEnd=w=>{
   for(let k=0;k<ns.length;k++)if(m>=ns[k][0]&&m<ns[k][1])return ns.length-k;
   return 0;
 };
-export function cascadeForms(old,new0){
+function cascade1(old,new0){
   if(!Array.isArray(old)||old.length<6||!new0||!new0.trim())return null;
   const o=old.map(split),n=split(new0.trim());
   const ob=o.map(x=>strip(x.w));
@@ -34,5 +34,16 @@ export function cascadeForms(old,new0){
     }
     out.push(f+o[i].suf+(o[i].rest.length?' / '+o[i].rest.join(' / '):''));
   }
+  return out;
+}
+
+/* se nella 1ª persona ci sono più varianti («ζούλησα / ζούληξα») ricalcolo le altre persone per ciascuna e le unisco */
+export function cascadeForms(old,new0){
+  const vs=String(new0||'').split(' / ').map(x=>x.trim()).filter(Boolean);
+  if(vs.length<2)return cascade1(old,new0);
+  const rs=vs.map(v=>cascade1(old,v));
+  if(rs.some(r=>!r))return null;
+  const out=[vs.join(' / ')];
+  for(let i=1;i<6;i++)out.push([...new Set(rs.flatMap(r=>r[i].split(' / ')))].join(' / '));
   return out;
 }
