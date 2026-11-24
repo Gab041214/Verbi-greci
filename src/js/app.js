@@ -334,7 +334,8 @@ function openEditor(e,voiceId){
   let h=`<div class="editor" id="ed"><h3>Correggi: <span lang="el">${esc(e.lemma)}</span> — ${esc(v.label)}</h3><p class="mute">Scrivi le forme esatte. Più varianti separate da « / ». Le celle lasciate invariate continuano a seguire le regole. Se correggi la 1ª persona singolare di un tempo, le altre persone di quel tempo si ricalcolano (puoi comunque correggerle una per una).</p><div class="ef">`;
   for(const [f,name,n] of FIELDS){
     const raw=v.raw[f];if(!raw)continue;
-    h+=`<fieldset><legend>${name}</legend>`+raw.map((x,i)=>`<label><span lang="el">${labels(n)[i]}</span><input lang="el" data-f="${f}" data-i="${i}" data-o="${esc(x)}" value="${esc(x)}" spellcheck="false"></label>`).join('')+`</fieldset>`;
+    const okey=overrideKey(e,v.id,f);
+    h+=`<fieldset data-f="${f}"><legend>${name}${okey&&e.O&&e.O[okey]?` <button type="button" class="lnk" data-reset="${f}">Ripristina calcolo automatico</button>`:''}</legend>`+raw.map((x,i)=>`<label><span lang="el">${labels(n)[i]}</span><input lang="el" data-f="${f}" data-i="${i}" data-o="${esc(x)}" value="${esc(x)}" spellcheck="false"></label>`).join('')+`</fieldset>`;
   }
   if(v.raw.ptc!==undefined)h+=`<fieldset><legend>Gerundio / participio</legend><label><span>Gerundio</span><input lang="el" data-f="ptc" data-i="0" data-o="${esc(v.raw.ptc)}" value="${esc(v.raw.ptc)}"></label>${typeof v.raw.m==='string'?`<label><span>Part. passato</span><input lang="el" data-f="m" data-i="0" data-o="${esc(v.raw.m)}" value="${esc(v.raw.m)}"></label>`:''}</fieldset>`;
   h+=`</div>
@@ -342,6 +343,12 @@ function openEditor(e,voiceId){
   $('out').insertAdjacentHTML('afterbegin',h);
   $('ed').scrollIntoView({block:'nearest'});
   $('ed-x').onclick=()=>$('ed').remove();
+  /* «Ripristina calcolo automatico»: alla chiusura il tempo torna a essere ricavato dalle regole e dalle altre forme */
+  $('ed').querySelectorAll('[data-reset]').forEach(b=>b.onclick=()=>{
+    const fs=b.closest('fieldset');const on=fs.dataset.reset!=='1';
+    fs.dataset.reset=on?'1':'';fs.classList.toggle('rst',on);
+    b.textContent=on?'Verrà ricalcolato: annulla':'Ripristina calcolo automatico';
+  });
   /* dalla 1ª persona singolare alle altre cinque dello stesso tempo */
   $('ed').addEventListener('change',ev=>{
     const t=ev.target;
@@ -362,7 +369,10 @@ function openEditor(e,voiceId){
     $('ed').querySelectorAll('input[data-f]').forEach(inp=>{
       (groups[inp.dataset.f]??=[])[+inp.dataset.i]=[inp.value.trim(),inp.dataset.o];
     });
+    const rst=new Set([...$('ed').querySelectorAll('fieldset[data-reset="1"]')].map(x=>x.dataset.f));
+    for(const f of rst){const k=overrideKey(e,v.id,f);if(k)delete ne.O[k];}
     for(const [f,arr] of Object.entries(groups)){
+      if(rst.has(f))continue;
       if(!arr.some(([n,o])=>n!==o))continue;
       const key=(f==='ptc'||f==='m')?f:overrideKey(e,v.id,f);
       if(!key)continue;
