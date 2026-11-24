@@ -36,3 +36,10 @@ test('se il congiuntivo passivo è già scritto, resta com\'è',()=>{
   const e=finalizeEntry({...g,O:{...g.O,paor:['υποβλήθηκα','υποβλήθηκες','υποβλήθηκε','υποβληθήκαμε','υποβληθήκατε','υποβλήθηκαν(ε)'],psubj:['Α','Β','Γ','Δ','Ε','Ζ']}});
   assert.equal(conjugate(e).find(v=>v.id==='pass').raw.subj[0],'Α');
 });
+
+test('più varianti nella 1ª persona: le altre persone le seguono', () => {
+  const old=['ζούλησα','ζούλησες','ζούλησε','ζουλήσαμε','ζουλήσατε','ζούλησαν(ε)'];
+  const r=cascadeForms(old,'ζούλησα / ζούληξα');
+  assert.deepEqual(r,['ζούλησα / ζούληξα','ζούλησες / ζούληξες','ζούλησε / ζούληξε','ζουλήσαμε / ζουλήξαμε','ζουλήσατε / ζουλήξατε','ζούλησαν(ε) / ζούληξαν(ε)']);
+  assert.equal(cascadeForms(old,'ζούλησα / foo'),null);
+});
