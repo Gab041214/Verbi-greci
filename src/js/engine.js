@@ -135,13 +135,30 @@ function presentStem(e){
   return {base,j:accentIdx(base)};
 }
 
+/* radici dell'aoristo quando la 1ª persona ha più varianti («ζούλησα / ζούληξα»): servono a congiuntivo, futuro e imperativo.
+   La prima variante resta sempre la radice del verbo (sStem); l'aumento eventuale si toglie anche dalle altre. */
+function aoristStems(O,sStem){
+  const forms=O.aor&&O.aor[0]?String(O.aor[0]).split(' / '):[];
+  if(forms.length<2||!sStem)return null;
+  const stems=forms.map(x=>strip(x.replace(/\([α-ω]\)$/,'').trim())).map(x=>/α$/.test(x)?x.slice(0,-1):null);
+  if(stems.some(x=>!x))return null;
+  const first=stems[0];
+  if(!first.endsWith(sStem))return null;
+  const pre=first.slice(0,first.length-sStem.length);
+  const out=stems.map((x,i)=>i===0?sStem:(pre?(x.startsWith(pre)?x.slice(pre.length):null):x));
+  return out.some(x=>!x)?null:[...new Set(out)];
+}
+const mergeVariants=lists=>lists[0].map((_,i)=>[...new Set(lists.flatMap(l=>String(l[i]).split(' / ')))].join(' / '));
 function aoristBlock(e){
   const O=e.O,r={};
   const sStem=(e.s||e.a||'').replace('=','');
+  const st=aoristStems(O,strip(sStem));
   r.aor=O.aor||(e.a?pastForms(e.a):null);
   r.subj=O.subj||(sStem?subjForms(sStem):null);
+  if(!O.subj&&st&&st.length>1)r.subj=mergeVariants(st.map(x=>subjForms(x)));
   r.inf=r.subj?r.subj[2].split(' / ')[0]:null;
   r.iaor=O.iaor||(sStem?[imp2sg(sStem),imp2pl(sStem)]:null);
+  if(!O.iaor&&st&&st.length>1)r.iaor=mergeVariants(st.map(x=>[imp2sg(x),imp2pl(x)]));
   return r;
 }
 
@@ -194,8 +211,16 @@ function buildPassive(e){
     if(O.paor&&!O.psubj){const m=String(O.paor[0]).split(' / ')[0].match(/^(.+)ηκα$/);if(m)pst=strip(m[1]);}
     f.aor=O.paor||(e.p?pastForms(e.p,['ηκα','ηκες','ηκε','ηκαμε','ηκατε','ηκαν(ε)'],true):null);
     f.subj=O.psubj||(pst?['ώ','είς','εί','ούμε','είτε','ούν(ε)'].map(en=>joinAlt(pst,0,en)):null);
+    /* più varianti dell'aoristo passivo (ζουλήχτηκα / ζουλήθηκα): congiuntivo e imperativo le seguono */
+    let pvs=null;
+    if(O.paor&&!O.psubj){
+      const ps=String(O.paor[0]).split(' / ').map(x=>{const m=x.replace(/\([α-ω]\)$/,'').trim().match(/^(.+)ηκα$/);return m?strip(m[1]):null;});
+      if(ps.length>1&&ps.every(Boolean))pvs=[...new Set(ps)];
+    }
+    if(pvs&&pvs.length>1)f.subj=mergeVariants(pvs.map(p=>['ώ','είς','εί','ούμε','είτε','ούν(ε)'].map(en=>joinAlt(p,0,en))));
     f.inf=O.pinf?O.pinf[0]:(f.subj?f.subj[2].split(' / ')[0]:null);
     f.iaor=O.piaor||(e.i&&pst?[fin(stressSyl(strip(e.i)+'ου',lastSyl(e.i))),fin(strip(pst)+'είτε')]:null);
+    if(!O.piaor&&pvs&&pvs.length>1&&f.iaor)f.iaor=[f.iaor[0],pvs.map(p=>fin(strip(p)+'είτε')).join(' / ')];
   }
   f.m=e.m||null;
   f.ptc=dep&&O.ptc?O.ptc[0]:null;
