@@ -69,3 +69,10 @@ test('piano: righe uguali, passivo su verbo senza passivo, formato errato', ()=>
   const r=planImport(parseTable('α\nβ\n'),find,()=>true);
   assert.ok(r.badFormat);
 });
+import {needsReview as nr} from '../src/js/translations.js';
+test('anche i verbi senza traduzione sono da rivedere', () => {
+  assert.ok(nr({_origin:'user',gloss:'',gloss_en:undefined}));
+  assert.ok(nr({_origin:'user',gloss:'to stink',gloss_en:'to stink'}));
+  assert.ok(!nr({_origin:'user',gloss:'puzzare',gloss_en:'to stink'}));
+  assert.ok(!nr({_origin:'base',gloss:''}));
+});
