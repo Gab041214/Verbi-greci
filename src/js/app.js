@@ -650,7 +650,7 @@ const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · gi�
 function bulkProblems(){
   $('bprob').hidden=!PROB.length;
   $('bprob-list').textContent=PROB.map(p=>p.t+' — '+p.why).join('\n');
-  const n=rulesEligible().length;$('brules').hidden=!n;$('brules').textContent='Importa con le regole ('+n+')';
+  const n=rulesEligible().filter(p=>RULES_END.test(p.t)||splitAna(p.t).some(c=>INDEX.has(keyOf(c.rest)))).length;$('brules').hidden=!n;$('brules').textContent='Importa con le regole ('+n+')';
 }
 /* forma passiva trovata (χορεύομαι): la aggiungo al verbo attivo che è già nell'archivio. 'defer' = l'attivo non c'è ancora, riprovo alla fine */
 async function bulkPassive(t,final){
@@ -772,7 +772,7 @@ async function rlOpen(){
   openOvl('ov-rl',$('brules'));
   if(rlBusy)return;rlBusy=true;
   const todo=rulesEligible().map(p=>p.t),listed=new Set(PROB.map(p=>keyOf(p.t)));
-  rlRows=[];$('rl-list').innerHTML='';$('rl-go').disabled=true;$('rl-log').textContent='';$('rl-prog').hidden=false;$('rl-prog').max=Math.max(todo.length,1);
+  rlRows=[];const rlSkip=[];$('rl-skip').textContent='';$('rl-list').innerHTML='';$('rl-go').disabled=true;$('rl-log').textContent='';$('rl-prog').hidden=false;$('rl-prog').max=Math.max(todo.length,1);
   let i=0;
   for(const t of todo){
     $('rl-prog').value=++i;$('rl-log').textContent='Leggo '+t+'…';
@@ -781,7 +781,7 @@ async function rlOpen(){
       if(!fv.entry.fromHeadword)throw new Error('ora la pagina ha una tabella: importala dalla ricerca');
       /* con prefisso ανα-: prima provo a ricavarlo dal verbo semplice (calco) */
       const dv=splitAna(t).length?await tryDerive(t,fv.entry,true):null;
-      if(!dv&&!RULES_END.test(t))continue;
+      if(!dv&&!RULES_END.test(t)){rlSkip.push(t);continue;}
       const r=dv?{entry:dv.entry}:fromHeadword(fv.entry);
       const ent=finalizeEntry(r.entry);
       const pf=passiveCandidates(t,ent.cls)[0];
@@ -795,6 +795,7 @@ async function rlOpen(){
     renderRl();await sleep(150);
   }
   $('rl-prog').hidden=true;$('rl-log').textContent=rlRows.filter(x=>x.noP).length+' verbi pronti';
+  if(rlSkip.length)$('rl-skip').textContent=rlSkip.length+' non preparati (verbo senza prefisso non trovato, da fare a mano): '+rlSkip.join(', ');
   rlBusy=false;renderRl();
 }
 function renderRl(){
