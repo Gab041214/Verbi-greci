@@ -645,7 +645,7 @@ function bulkMarks(){
 }
 $('bletter').onchange=()=>{bulkCont=null;const x=bulkState()[$('bletter').value];PROB.length=0;if(x)PROB.push(...(x.problems||[]));bulkProblems();bulkMarks();};
 setTimeout(bulkMarks,0);
-let ALT=0,DER=0,EL=0,PASSN=0,bulkPend=[],bulkNeed=[],bulkSeen=new Set();
+let ALT=0,DER=0,EL=0,PASSN=0,bulkPend=[],bulkNeed=[],bulkSeen=new Set(),bulkAlt=new Map();
 const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · passive aggiunte ${PASSN} · da Wiktionary greca ${EL} · in attesa ${bulkPend.length} · forme alternative ${ALT} · derivati ${DER} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
 function bulkProblems(){
   $('bprob').hidden=!PROB.length;
@@ -664,7 +664,7 @@ async function bulkPassive(t,final){
 }
 $('bulk').onclick=async()=>{
   stopBulk=false;$('bulk').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
-  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;DER=0;PASSN=0;EL=0;bulkPend=[];bulkNeed=[];bulkSeen=new Set();}bulkProblems();
+  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;DER=0;PASSN=0;EL=0;bulkPend=[];bulkNeed=[];bulkSeen=new Set();bulkAlt=new Map();}bulkProblems();
   /* un verbo: restituisce 'q' se non ha usato la rete */
   const one=async(t,final)=>{
     if(!final)bulkSeen.add(keyOf(t));
@@ -674,13 +674,19 @@ $('bulk').onclick=async()=>{
       if(r==='done'){PASSN++;return;}
       if(r==='have'){skipped++;return 'q';}
       if(r==='defer'){bulkPend.push(t);return 'q';}
+      /* il verbo attivo era una forma alternativa di un verbo già in archivio (στεναχωρώ → στενοχωρώ): anche questo passivo è una forma alternativa */
+      if(final){
+        const ca=activeCandidates(t).find(c=>bulkAlt.has(keyOf(c)));
+        const X=ca&&bulkAlt.get(keyOf(ca));
+        if(X&&(BYID.has(keyOf(X))||INDEX.has(keyOf(X)))){ALT++;return 'q';}
+      }
       if(final&&activeCandidates(t).some(c=>bulkSeen.has(keyOf(c)))){PROB.push({t,why:'verbo attivo non in archivio: importalo e usa «Cerca le voci passive mancanti»'});bulkProblems();return 'q';}
     }
     try{
       /* in blocco nessuno controlla le forme: si salvano solo verbi con la tabella letta per intero */
       let fv=null,ferr=null;
       try{fv=await fetchVerbFull(t);}catch(err){ferr=err;}
-      if(fv&&fv.report.redirect){ALT++;return;}
+      if(fv&&fv.report.redirect){ALT++;bulkAlt.set(keyOf(t),fv.report.redirect.to);return;}
       if(!fv||fv.entry.fromHeadword){
         const dv=await tryDerive(t,fv&&fv.entry,false);
         if(dv){
