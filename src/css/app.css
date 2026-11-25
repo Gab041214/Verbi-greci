@@ -298,3 +298,4 @@ td{overflow-wrap:anywhere}
 td.chk{padding-right:6px}
 #go-btn:disabled{opacity:.45;cursor:default}
 .rlpref{color:var(--warn)}
+.rlcalc{color:var(--mute)}
