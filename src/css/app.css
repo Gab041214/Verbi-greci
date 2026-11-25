@@ -297,3 +297,4 @@ td{overflow-wrap:anywhere}
 .item .dotbtn{justify-content:center}
 td.chk{padding-right:6px}
 #go-btn:disabled{opacity:.45;cursor:default}
+.rlpref{color:var(--warn)}
