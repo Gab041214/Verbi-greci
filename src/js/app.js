@@ -69,10 +69,11 @@ function chkMenu(anchor,items){
   m.querySelectorAll('button').forEach(b=>b.onclick=()=>{const x=items[+b.dataset.i];close();x.run();});
 }
 function openFormMenu(btn,ctx){
-  const k=btn.dataset.k,on=marks.has(ctx.id,k);
+  const k=btn.dataset.k,all=+btn.dataset.all||0,on=btn.classList.contains('on');
+  const keys=all?Array.from({length:all},(_,j)=>k.replace(/:0$/,':'+j)):[k];
   chkMenu(btn,[
-    {label:'Da controllare',check:on,run:()=>{marks.set(ctx.id,k,true);btn.classList.add('on');}},
-    {label:'Controllato',check:!on,run:()=>{marks.set(ctx.id,k,false);btn.classList.remove('on');}}
+    {label:all?'Da controllare (tutto il tempo)':'Da controllare',check:on,run:()=>{marks.setMany(ctx.id,keys,true);btn.classList.add('on');}},
+    {label:'Controllato',check:!on,run:()=>{marks.setMany(ctx.id,keys,false);btn.classList.remove('on');}}
   ]);
 }
 /* tutti i segni possibili di un verbo (voce:scheda:posizione) */
@@ -100,13 +101,16 @@ function autoMark(saved,report){
 
 /* ---------- resa ---------- */
 /* pallino «da controllare» di una forma; ctx = {id del verbo, voce} */
-function dotBtn(ctx,cardId,i){
+function dotBtn(ctx,cardId,i,all){
   const k=marks.markKey(ctx.voice,cardId,i);
-  return `<button type="button" class="dotbtn${marks.has(ctx.id,k)?' on':''}" data-k="${k}" aria-label="Controllo della forma" aria-haspopup="true"><i></i></button>`;
+  /* all = numero di forme del tempo: un solo puntino sulla prima persona vale per tutte */
+  const on=all?Array.from({length:all},(_,j)=>marks.has(ctx.id,marks.markKey(ctx.voice,cardId,j))).some(Boolean):marks.has(ctx.id,k);
+  return `<button type="button" class="dotbtn${on?' on':''}" data-k="${k}"${all?` data-all="${all}"`:''} aria-label="${all?'Controllo del tempo':'Controllo della forma'}" aria-haspopup="true"><i></i></button>`;
 }
 function card(c,ctx){
   if(c.value!==undefined)return `<article class="card nom"><h4>${esc(c.it)} <small lang="el">${esc(c.gr)}</small></h4><p class="big${ctx?' chkrow':''}"><span>${cell(c.value)}</span>${ctx?dotBtn(ctx,c.id,0):''}</p></article>`;
-  const rows=c.forms.map((f,i)=>`<tr><th lang="el">${c.imp?['εσύ','εσείς'][i]:PERS[i]}</th><td>${cell(f)}</td>${ctx?`<td class="chk">${dotBtn(ctx,c.id,i)}</td>`:''}</tr>`).join('');
+  const six=!c.imp&&c.forms.length===6;
+  const rows=c.forms.map((f,i)=>`<tr><th lang="el">${c.imp?['εσύ','εσείς'][i]:PERS[i]}</th><td>${cell(f)}</td>${ctx?`<td class="chk">${six?(i===0?dotBtn(ctx,c.id,0,6):''):dotBtn(ctx,c.id,i)}</td>`:''}</tr>`).join('');
   return `<article class="card"><h4>${esc(c.it)} <small lang="el">${esc(c.gr)}</small></h4><table>${rows}</table></article>`;
 }
 function safeConj(e){
@@ -141,7 +145,7 @@ function renderEntry(el,e,voiceId,opts={}){
 
 /* ---------- ricerca ---------- */
 function show(e,voice){
-  current=e;
+  current=e;shownQ=shownKeyFor(e);syncGo();
   const actions=`<button type="button" class="btn" data-a="edit">Correggi forme</button>`+
     (e.guessed?'':`<button type="button" class="btn" data-a="gloss">Correggi traduzione</button>`)+
     (!e.guessed&&lacksPassive(e)?`<button type="button" class="btn" data-a="addps">Aggiungi voce passiva</button>`:'')+
@@ -267,6 +271,15 @@ async function pickLemma(l,voice,q,el=$('out')){
   try{const {entry,report}=await fetchVerb(l);if(entry.fromHeadword)resolveHeadword(el,entry);else showPreview(el,entry,report);}
   catch(err){failBox(el,err,'Importazione non riuscita',l);}
 }
+/* «Coniuga» resta inattivo finché la tabella del verbo scritto è già sullo schermo */
+let shownQ='';
+function shownKeyFor(e){
+  const k=keyOf($('q').value);if(!k)return '';
+  const h=INDEX.get(k);if(h&&h.e===e)return k;
+  if((FORMS.get(k)||[]).some(x=>x.e===e))return k;
+  return e.forms&&keyOf(e.forms[0])===k?k:'';
+}
+function syncGo(){const b=$('f').querySelector('button:not(#q-clear)');if(b)b.disabled=!!shownQ&&keyOf($('q').value)===shownQ;}
 async function search(q){
   const seq=++searchSeq;
   const k=keyOf(q);if(!k){$('out').innerHTML='';return;}
@@ -949,6 +962,8 @@ function go(tab){
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
 $('q-clear').onclick=()=>{const q=$('q');q.value='';q.dispatchEvent(new Event('input',{bubbles:true}));$('out').innerHTML='';$('sugg').innerHTML='';current=null;window.scrollTo(0,0);};
+$('q').addEventListener('input',syncGo);
+$('q-clear').addEventListener('click',()=>{shownQ='';syncGo();});
 $('f').addEventListener('submit',ev=>{ev.preventDefault();search($('q').value);});
 $('q').addEventListener('input',()=>suggest($('q').value));
 
