@@ -279,7 +279,7 @@ function shownKeyFor(e){
   if((FORMS.get(k)||[]).some(x=>x.e===e))return k;
   return e.forms&&keyOf(e.forms[0])===k?k:'';
 }
-function syncGo(){const b=$('f').querySelector('button:not(#q-clear)');if(b)b.disabled=!!shownQ&&keyOf($('q').value)===shownQ;}
+function syncGo(){const b=$('go-btn');if(b)b.disabled=!!shownQ&&keyOf($('q').value)===shownQ;}
 async function search(q){
   const seq=++searchSeq;
   const k=keyOf(q);if(!k){$('out').innerHTML='';return;}
