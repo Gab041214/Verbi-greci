@@ -650,7 +650,7 @@ const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · gi�
 function bulkProblems(){
   $('bprob').hidden=!PROB.length;
   $('bprob-list').textContent=PROB.map(p=>p.t+' — '+p.why).join('\n');
-  const n=rulesEligible().filter(p=>RULES_END.test(p.t)||splitAna(p.t).some(c=>INDEX.has(keyOf(c.rest)))).length;$('brules').hidden=!n;$('brules').textContent='Importa con le regole ('+n+')';
+  const n=rulesEligible().filter(p=>isPassTitle(p.t)||RULES_END.test(p.t)||splitAna(p.t).some(c=>INDEX.has(keyOf(c.rest)))).length;$('brules').hidden=!n;$('brules').textContent='Importa con le regole ('+n+')';
 }
 /* forma passiva trovata (χορεύομαι): la aggiungo al verbo attivo che è già nell'archivio. 'defer' = l'attivo non c'è ancora, riprovo alla fine */
 async function bulkPassive(t,final){
@@ -763,7 +763,16 @@ $('bulkstop').onclick=()=>{stopBulk=true;};
 
 /* ---------- importa con le regole (verbi regolari senza tabella) ---------- */
 const RULES_END=/(ίζω|ώνω|εύω|άζω)$/;
-function rulesEligible(){return PROB.filter(p=>/^pagina senza tabella/.test(p.why)&&!isPassTitle(p.t)&&(RULES_END.test(p.t)||splitAna(p.t).length)&&!INDEX.has(keyOf(p.t)));}
+/* deponente = titolo in -μαι il cui verbo attivo non è né in archivio né tra gli scartati */
+function isDeponent(t){
+  if(!isPassTitle(t))return false;
+  const acts=activeCandidates(t);
+  if(!acts.length)return false;
+  const listed=new Set(PROB.map(p=>keyOf(p.t)));
+  return !acts.some(a=>INDEX.has(keyOf(a))||listed.has(keyOf(a)));
+}
+const DEP_REG=/(ίζομαι|άζομαι|εύομαι|ώνομαι|[^ούιέά]ομαι)$/;
+function rulesEligible(){return PROB.filter(p=>/^pagina senza tabella/.test(p.why)&&!INDEX.has(keyOf(p.t))&&(isPassTitle(p.t)?isDeponent(p.t):(RULES_END.test(p.t)||splitAna(p.t).length)));}
 const aorOf=(e,voice)=>{try{const v=conjugate(e).find(x=>x.id===voice);const c=v&&[].concat(...Object.values(v.cards)).find(x=>x.id==='aor');return c&&c.forms?c.forms[0]:'';}catch(_){return '';}};
 let rlRows=[],rlBusy=false;
 /* possibili prefissi: l'aumento dell'aoristo è da controllare, quindi non preselezionati */
@@ -780,17 +789,18 @@ async function rlOpen(){
       const fv=await fetchVerb(t);
       if(!fv.entry.fromHeadword)throw new Error('ora la pagina ha una tabella: importala dalla ricerca');
       /* con prefisso ανα-: prima provo a ricavarlo dal verbo semplice (calco) */
-      const dv=splitAna(t).length?await tryDerive(t,fv.entry,true):null;
-      if(!dv&&!RULES_END.test(t)){rlSkip.push(t);continue;}
+      const dep=isPassTitle(t);
+      const dv=!dep&&splitAna(t).length?await tryDerive(t,fv.entry,true):null;
+      if(!dep&&!dv&&!RULES_END.test(t)){rlSkip.push(t);continue;}
       const r=dv?{entry:dv.entry}:fromHeadword(fv.entry);
       const ent=finalizeEntry(r.entry);
-      const pf=passiveCandidates(t,ent.cls)[0];
+      const pf=dep?null:passiveCandidates(t,ent.cls)[0];
       /* le regole danno di norma anche la passiva: preparo le due varianti, con e senza */
       const withP=hasPassive(ent)?ent:(pf?withPassive(ent,pf):null);
       const noP=withP?withoutPassive(withP):ent;
       /* la passiva è preselezionata se la sua forma compare nell'elenco di Wiktionary (cioè esiste una pagina in -ομαι) */
       const pre=!!withP&&passiveCandidates(t,ent.cls).some(x=>listed.has(keyOf(x)));
-      rlRows.push({t,withP,noP,pre,calc:dv?dv.report.derived.from:'',pref:!dv&&RL_PREF.test(t),sel:!(!dv&&RL_PREF.test(t)),psel:pre,aor:aorOf(noP,'act'),paor:withP?aorOf(withP,'pass'):'',disp:noP.display,gloss:noP.gloss,cls:noP.cls});
+      rlRows.push({t,withP,noP,pre,dep,depcls:dep&&!DEP_REG.test(t),calc:dv?dv.report.derived.from:'',pref:!dv&&!dep&&RL_PREF.test(t),sel:dep?DEP_REG.test(t):!(!dv&&RL_PREF.test(t)),psel:pre,aor:aorOf(noP,dep?'pass':'act'),paor:withP?aorOf(withP,'pass'):'',disp:noP.display,gloss:noP.gloss,cls:noP.cls});
     }catch(err){rlRows.push({t,err:err&&err.message||'errore'});}
     renderRl();await sleep(150);
   }
@@ -801,7 +811,7 @@ async function rlOpen(){
 function renderRl(){
   $('rl-list').innerHTML=rlRows.map((r,i)=>r.err
     ?`<div class="rlrow bad"><span><b lang="el">${esc(r.t)}</b><em>non preparato: ${esc(r.err)}</em></span></div>`
-    :`<div class="rlrow"><label><input type="checkbox" data-i="${i}" data-k="v"${r.sel?' checked':''}><span><b lang="el">${esc(r.disp)}</b> ${esc(r.gloss||'')}<em>aoristo <span lang="el">${esc(r.aor)}</span> · ${esc(CLASS_DESC[r.cls]||r.cls)}${r.calc?' · <span class="rlcalc">calco di <span lang="el">'+esc(r.calc)+'</span></span>':''}${r.pref?' · <span class="rlpref">prefisso: controlla l\'aoristo</span>':''}</em></span></label>${r.withP?`<label class="rlps"><input type="checkbox" data-i="${i}" data-k="p"${r.psel?' checked':''}><span>con voce passiva <span lang="el">${esc(r.paor)}</span></span></label>`:''}</div>`).join('');
+    :`<div class="rlrow"><label><input type="checkbox" data-i="${i}" data-k="v"${r.sel?' checked':''}><span><b lang="el">${esc(r.disp)}</b> ${esc(r.gloss||'')}<em>aoristo <span lang="el">${esc(r.aor)}</span> · ${esc(CLASS_DESC[r.cls]||r.cls)}${r.calc?' · <span class="rlcalc">calco di <span lang="el">'+esc(r.calc)+'</span></span>':''}${r.dep?' · <span class="rlcalc">deponente</span>':''}${r.depcls?' · <span class="rlpref">classe da controllare</span>':''}${r.pref?' · <span class="rlpref">prefisso: controlla l\'aoristo</span>':''}</em></span></label>${r.withP?`<label class="rlps"><input type="checkbox" data-i="${i}" data-k="p"${r.psel?' checked':''}><span>con voce passiva <span lang="el">${esc(r.paor)}</span></span></label>`:''}</div>`).join('');
   rlCount();
 }
 function rlCount(){
