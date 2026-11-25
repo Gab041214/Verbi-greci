@@ -6,7 +6,7 @@ import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktio
 import {fromHeadword} from './headword.js';
 import {fetchVerbFull,fetchElEntry} from './elwikt.js';
 import {isPassTitle,activeCandidates,passiveCandidates,lacksPassive,withPassive,withoutPassive,hasPassive} from './passive.js';
-import {splitPrefix,deriveEntry} from './derive.js';
+import {splitPrefix,splitAna,deriveEntry} from './derive.js';
 import {initClearable} from './clearable.js';
 import * as marks from './marks.js';
 import {buildRows,toCsv,toTsv,parseTable,planImport} from './translations.js';
@@ -193,16 +193,20 @@ function askClass(el,lemma,onPick,why){
 }
 /* verbo con prefisso (ξανα-) senza tabella: lo ricavo dal verbo base che conosco già (archivio, oppure tabella completa su Wiktionary) */
 async function tryDerive(title,wik,web=true){
-  const sp=splitPrefix(title);if(!sp)return null;
-  let base=null;
-  const h=INDEX.get(keyOf(sp.rest));
-  if(h)base=h.e;
-  else if(/ομαι$/.test(sp.rest)){const h2=INDEX.get(keyOf(sp.rest.replace(/ομαι$/,'ω')));if(h2)base=h2.e;}
-  if(!base&&web){
-    try{const r=await fetchVerb(sp.rest);const ok=!r.entry.fromHeadword&&!(r.report.missing&&r.report.missing.length)&&!(r.report.repairs&&r.report.repairs.length);if(ok)base=finalizeEntry(r.entry);}catch(_){}
+  const cands=[splitPrefix(title),...splitAna(title)].filter(Boolean);
+  let sp=null,base=null;
+  for(const c of cands){
+    base=null;
+    const h=INDEX.get(keyOf(c.rest));
+    if(h)base=h.e;
+    else if(/ομαι$/.test(c.rest)){const h2=INDEX.get(keyOf(c.rest.replace(/ομαι$/,'ω')));if(h2)base=h2.e;}
+    if(!base&&web){
+      try{const r=await fetchVerb(c.rest);const ok=!r.entry.fromHeadword&&!(r.report.missing&&r.report.missing.length)&&!(r.report.repairs&&r.report.repairs.length);if(ok)base=finalizeEntry(r.entry);}catch(_){}
+    }
+    if(base){sp=c;break;}
   }
   if(!base)return null;
-  const d=deriveEntry(base,sp.prefix);if(!d)return null;
+  const d=deriveEntry(base,sp.prefix,sp.kind);if(!d)return null;
   if(wik&&wik.gloss){d.gloss=wik.gloss;if(wik.gloss_en)d.gloss_en=wik.gloss_en;}
   else if(base.gloss){const en=glossIsEn(base);d.gloss=base.gloss+(en?' again':' di nuovo');if(en)d.gloss_en=d.gloss;}
   d.keys=[...new Set([...d.keys])];
@@ -759,11 +763,11 @@ $('bulkstop').onclick=()=>{stopBulk=true;};
 
 /* ---------- importa con le regole (verbi regolari senza tabella) ---------- */
 const RULES_END=/(ίζω|ώνω|εύω|άζω)$/;
-function rulesEligible(){return PROB.filter(p=>/^pagina senza tabella/.test(p.why)&&!isPassTitle(p.t)&&RULES_END.test(p.t)&&!INDEX.has(keyOf(p.t)));}
+function rulesEligible(){return PROB.filter(p=>/^pagina senza tabella/.test(p.why)&&!isPassTitle(p.t)&&(RULES_END.test(p.t)||splitAna(p.t).length)&&!INDEX.has(keyOf(p.t)));}
 const aorOf=(e,voice)=>{try{const v=conjugate(e).find(x=>x.id===voice);const c=v&&[].concat(...Object.values(v.cards)).find(x=>x.id==='aor');return c&&c.forms?c.forms[0]:'';}catch(_){return '';}};
 let rlRows=[],rlBusy=false;
 /* possibili prefissi: l'aumento dell'aoristo è da controllare, quindi non preselezionati */
-const RL_PREF=/^(ανα|ανε|αντι|απα|απε|απο|αφα)/;
+const RL_PREF=/^(ανα|ανε|αντι|απα|απε|απο|αφα|κατα|παρα|μετα|επι|υπο)/;
 async function rlOpen(){
   openOvl('ov-rl',$('brules'));
   if(rlBusy)return;rlBusy=true;
@@ -775,7 +779,10 @@ async function rlOpen(){
     try{
       const fv=await fetchVerb(t);
       if(!fv.entry.fromHeadword)throw new Error('ora la pagina ha una tabella: importala dalla ricerca');
-      const r=fromHeadword(fv.entry);
+      /* con prefisso ανα-: prima provo a ricavarlo dal verbo semplice (calco) */
+      const dv=splitAna(t).length?await tryDerive(t,fv.entry,true):null;
+      if(!dv&&!RULES_END.test(t))continue;
+      const r=dv?{entry:dv.entry}:fromHeadword(fv.entry);
       const ent=finalizeEntry(r.entry);
       const pf=passiveCandidates(t,ent.cls)[0];
       /* le regole danno di norma anche la passiva: preparo le due varianti, con e senza */
@@ -783,7 +790,7 @@ async function rlOpen(){
       const noP=withP?withoutPassive(withP):ent;
       /* la passiva è preselezionata se la sua forma compare nell'elenco di Wiktionary (cioè esiste una pagina in -ομαι) */
       const pre=!!withP&&passiveCandidates(t,ent.cls).some(x=>listed.has(keyOf(x)));
-      rlRows.push({t,withP,noP,pre,pref:RL_PREF.test(t),sel:!RL_PREF.test(t),psel:pre,aor:aorOf(noP,'act'),paor:withP?aorOf(withP,'pass'):'',disp:noP.display,gloss:noP.gloss,cls:noP.cls});
+      rlRows.push({t,withP,noP,pre,calc:dv?dv.report.derived.from:'',pref:!dv&&RL_PREF.test(t),sel:!(!dv&&RL_PREF.test(t)),psel:pre,aor:aorOf(noP,'act'),paor:withP?aorOf(withP,'pass'):'',disp:noP.display,gloss:noP.gloss,cls:noP.cls});
     }catch(err){rlRows.push({t,err:err&&err.message||'errore'});}
     renderRl();await sleep(150);
   }
@@ -793,7 +800,7 @@ async function rlOpen(){
 function renderRl(){
   $('rl-list').innerHTML=rlRows.map((r,i)=>r.err
     ?`<div class="rlrow bad"><span><b lang="el">${esc(r.t)}</b><em>non preparato: ${esc(r.err)}</em></span></div>`
-    :`<div class="rlrow"><label><input type="checkbox" data-i="${i}" data-k="v"${r.sel?' checked':''}><span><b lang="el">${esc(r.disp)}</b> ${esc(r.gloss||'')}<em>aoristo <span lang="el">${esc(r.aor)}</span> · ${esc(CLASS_DESC[r.cls]||r.cls)}${r.pref?' · <span class="rlpref">prefisso: controlla l\'aoristo</span>':''}</em></span></label>${r.withP?`<label class="rlps"><input type="checkbox" data-i="${i}" data-k="p"${r.psel?' checked':''}><span>con voce passiva <span lang="el">${esc(r.paor)}</span></span></label>`:''}</div>`).join('');
+    :`<div class="rlrow"><label><input type="checkbox" data-i="${i}" data-k="v"${r.sel?' checked':''}><span><b lang="el">${esc(r.disp)}</b> ${esc(r.gloss||'')}<em>aoristo <span lang="el">${esc(r.aor)}</span> · ${esc(CLASS_DESC[r.cls]||r.cls)}${r.calc?' · <span class="rlcalc">calco di <span lang="el">'+esc(r.calc)+'</span></span>':''}${r.pref?' · <span class="rlpref">prefisso: controlla l\'aoristo</span>':''}</em></span></label>${r.withP?`<label class="rlps"><input type="checkbox" data-i="${i}" data-k="p"${r.psel?' checked':''}><span>con voce passiva <span lang="el">${esc(r.paor)}</span></span></label>`:''}</div>`).join('');
   rlCount();
 }
 function rlCount(){
