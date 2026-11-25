@@ -70,14 +70,28 @@ const joinAlt=(stem,j,en)=>en.split(' / ').map(x=>join(stem,j,x)).join(' / ');
 /* ================= Costruttori di forme ================= */
 const PERS_LABELS=['εγώ','εσύ','αυτός/-ή/-ό','εμείς','εσείς','αυτοί/-ές/-ά'];
 const E_PAST=['α','ες','ε','αμε','ατε','αν(ε)'];
+/* prefisso ανα- + verbo che inizia per consonante e ha la radice di una sola sillaba (πλέκω → ανέπλεξα):
+   l'aumento si mette dopo il prefisso, che perde la α finale; con radici più lunghe non serve (αναδιπλάσιασα) */
+const ANA_CL=/^(?:πλ|βλ|γλ|κλ|φλ|χλ|πρ|βρ|γρ|κρ|φρ|χρ|τρ|δρ|θρ|θλ|στ|σκ|σπ|σφ|σμ|σν|σχ|κτ|πτ|φθ|χθ|γν|κν|πν|μν|τσ|τζ|μπ|ντ|γκ|σθ|[βγδζθκλμνπρστφχψξ])/;
+function anaAug(stem){
+  const pm=stem.match(/^(ανα|κατα|παρα|μετα|επι|υπο|απο|αντι)/);
+  if(!pm)return null;
+  const rest=stem.slice(pm[1].length);
+  if(!rest||isV(rest[0])||rest[0]==='ρ'||nuclei(rest).length!==1)return null;
+  const m=rest.match(ANA_CL);
+  if(!m)return null;
+  if(m[0].length===1&&!isV(rest[1]||''))return null;
+  return {pre:pm[1],rest};
+}
 function pastForms(stem,ends=E_PAST,noAug=false){
   if(stem[0]==='='){noAug=true;stem=stem.slice(1);}
   stem=strip(stem);
-  const needAug=!noAug&&!isV(stem[0])&&nuclei(stem).length===1;
+  const ana=!noAug?anaAug(stem):null;
+  const needAug=!noAug&&!ana&&!isV(stem[0])&&nuclei(stem).length===1;
   return ends.map((e,i)=>{
     const eps=e.endsWith('(ε)');const en=eps?e.slice(0,-3):e;
     const pl=(i===3||i===4);
-    const w=((needAug&&!pl)?'ε':'')+stem+en;
+    const w=ana&&!pl?ana.pre.slice(0,-1)+'ε'+ana.rest+en:((needAug&&!pl)?'ε':'')+stem+en;
     return fin(stressEnd(w,3)+(eps?'(ε)':''));
   });
 }
