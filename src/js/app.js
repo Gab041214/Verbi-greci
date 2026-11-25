@@ -762,6 +762,8 @@ const RULES_END=/(ίζω|ώνω|εύω|άζω)$/;
 function rulesEligible(){return PROB.filter(p=>/^pagina senza tabella/.test(p.why)&&!isPassTitle(p.t)&&RULES_END.test(p.t)&&!INDEX.has(keyOf(p.t)));}
 const aorOf=(e,voice)=>{try{const v=conjugate(e).find(x=>x.id===voice);const c=v&&[].concat(...Object.values(v.cards)).find(x=>x.id==='aor');return c&&c.forms?c.forms[0]:'';}catch(_){return '';}};
 let rlRows=[],rlBusy=false;
+/* possibili prefissi: l'aumento dell'aoristo è da controllare, quindi non preselezionati */
+const RL_PREF=/^(ανα|ανε|αντι|απα|απε|απο|αφα)/;
 async function rlOpen(){
   openOvl('ov-rl',$('brules'));
   if(rlBusy)return;rlBusy=true;
@@ -781,7 +783,7 @@ async function rlOpen(){
       const noP=withP?withoutPassive(withP):ent;
       /* la passiva è preselezionata se la sua forma compare nell'elenco di Wiktionary (cioè esiste una pagina in -ομαι) */
       const pre=!!withP&&passiveCandidates(t,ent.cls).some(x=>listed.has(keyOf(x)));
-      rlRows.push({t,withP,noP,pre,aor:aorOf(noP,'act'),paor:withP?aorOf(withP,'pass'):'',disp:noP.display,gloss:noP.gloss,cls:noP.cls});
+      rlRows.push({t,withP,noP,pre,pref:RL_PREF.test(t),sel:!RL_PREF.test(t),psel:pre,aor:aorOf(noP,'act'),paor:withP?aorOf(withP,'pass'):'',disp:noP.display,gloss:noP.gloss,cls:noP.cls});
     }catch(err){rlRows.push({t,err:err&&err.message||'errore'});}
     renderRl();await sleep(150);
   }
@@ -791,17 +793,28 @@ async function rlOpen(){
 function renderRl(){
   $('rl-list').innerHTML=rlRows.map((r,i)=>r.err
     ?`<div class="rlrow bad"><span><b lang="el">${esc(r.t)}</b><em>non preparato: ${esc(r.err)}</em></span></div>`
-    :`<div class="rlrow"><label><input type="checkbox" data-i="${i}" data-k="v" checked><span><b lang="el">${esc(r.disp)}</b> ${esc(r.gloss||'')}<em>aoristo <span lang="el">${esc(r.aor)}</span> · ${esc(CLASS_DESC[r.cls]||r.cls)}</em></span></label>${r.withP?`<label class="rlps"><input type="checkbox" data-i="${i}" data-k="p"${r.pre?' checked':''}><span>con voce passiva <span lang="el">${esc(r.paor)}</span></span></label>`:''}</div>`).join('');
-  $('rl-go').disabled=rlBusy||!rlRows.some(r=>r.noP);
+    :`<div class="rlrow"><label><input type="checkbox" data-i="${i}" data-k="v"${r.sel?' checked':''}><span><b lang="el">${esc(r.disp)}</b> ${esc(r.gloss||'')}<em>aoristo <span lang="el">${esc(r.aor)}</span> · ${esc(CLASS_DESC[r.cls]||r.cls)}${r.pref?' · <span class="rlpref">prefisso: controlla l\'aoristo</span>':''}</em></span></label>${r.withP?`<label class="rlps"><input type="checkbox" data-i="${i}" data-k="p"${r.psel?' checked':''}><span>con voce passiva <span lang="el">${esc(r.paor)}</span></span></label>`:''}</div>`).join('');
+  rlCount();
 }
+function rlCount(){
+  const n=rlRows.filter(r=>r.noP&&r.sel).length;
+  $('rl-go').disabled=rlBusy||!n;
+  $('rl-go').textContent=n?'Salva le selezionate ('+n+')':'Salva le selezionate';
+}
+$('rl-list').addEventListener('change',ev=>{
+  const c=ev.target;if(!c.dataset||c.dataset.i===undefined)return;
+  const r=rlRows[+c.dataset.i];if(!r)return;
+  if(c.dataset.k==='v')r.sel=c.checked;else r.psel=c.checked;
+  rlCount();
+});
+$('rl-all').onclick=()=>{rlRows.forEach(r=>{if(r.noP)r.sel=true;});renderRl();};
+$('rl-none').onclick=()=>{rlRows.forEach(r=>{if(r.noP)r.sel=false;});renderRl();};
 async function rlSave(){
   let n=0,np=0;
   for(const [i,r] of rlRows.entries()){
     if(!r.noP)continue;
-    const on=$('rl-list').querySelector(`input[data-i="${i}"][data-k="v"]`);
-    if(!on||!on.checked)continue;
-    const wp=$('rl-list').querySelector(`input[data-i="${i}"][data-k="p"]`);
-    const ne=wp&&wp.checked&&r.withP?r.withP:r.noP;
+    if(!r.sel)continue;
+    const ne=r.psel&&r.withP?r.withP:r.noP;
     if(BYID.has(keyOf(ne.forms[0])))continue;
     const sv=await saveUser(ne,{});autoMark(sv,{noTable:true});n++;if(ne===r.withP){np++;passiveCandidates(r.t,ne.cls).forEach(x=>{const j=PROB.findIndex(p=>p.t===x);if(j>=0)PROB.splice(j,1);});}
     const k=PROB.findIndex(p=>p.t===r.t);if(k>=0)PROB.splice(k,1);
