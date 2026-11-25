@@ -82,8 +82,10 @@ export async function fetchElEntry(title,f=fetch){
 export async function fetchVerbFull(title,f=fetch){
   let en=null,err=null;
   try{en=await fetchVerb(title,f);}catch(e){err=e;}
-  if(en&&!en.entry.fromHeadword&&!en.report.redirect)return en;
   if(en&&en.report.redirect)return en;
+  /* tabella inglese con lettere non greche (es. v latina al posto di ν): prima provo quella greca */
+  const bad=!!(en&&en.report.repairs&&en.report.repairs.length);
+  if(en&&!en.entry.fromHeadword&&!bad)return en;
   const el=await fetchElEntry(title,f);
   if(!el){if(err)throw err;return en;}
   if(en&&en.entry){const g=en.entry.gloss_en||en.entry.gloss;if(g){el.entry.gloss=g;el.entry.gloss_en=g;}}
