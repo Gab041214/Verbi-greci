@@ -296,4 +296,4 @@ td{overflow-wrap:anywhere}
 /* puntini: più distanti dal bordo */
 .item .dotbtn{justify-content:center}
 td.chk{padding-right:6px}
-#f button:disabled{opacity:.45;cursor:default}
+#go-btn:disabled{opacity:.45;cursor:default}
