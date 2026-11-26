@@ -772,6 +772,14 @@ $('bdiag').onclick=async()=>{
   try{await navigator.clipboard.writeText(t);toast('Dettagli copiati ('+s.length+' verbi)');}catch(_){$('bprob-list').textContent=t;toast('Seleziona e copia');}
   $('bdiag').disabled=false;$('bdiag').textContent='Copia dettagli di alcuni verbi';
 };
+$('bd1go').onclick=async()=>{
+  const t=$('bd1').value.trim();if(!t)return;
+  const b=$('bd1go');b.disabled=true;b.textContent='Scarico…';
+  let out;
+  try{out='=== '+t+' — richiesta manuale\n'+await fetchDiag(t);}catch(err){out='=== '+t+' — dettagli non scaricati: '+err.message;}
+  try{await navigator.clipboard.writeText(out);toast('Dettagli copiati');}catch(_){$('bprob').hidden=false;$('bprob-list').textContent=out;toast('Seleziona e copia');}
+  b.disabled=false;b.textContent='Copia dettagli';
+};
 $('bcopy').onclick=async()=>{const t=PROB.map(p=>p.t+'\t'+String(p.why).replace(/[\t\r\n]+/g,' ')).join('\n');try{await navigator.clipboard.writeText(t);toast('Elenco copiato');}catch(_){const r=document.createRange();r.selectNodeContents($('bprob-list'));const s2=getSelection();s2.removeAllRanges();s2.addRange(r);toast('Seleziona e copia');}};
 $('bulkstop').onclick=()=>{stopBulk=true;};
 
