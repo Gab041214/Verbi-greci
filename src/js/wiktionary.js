@@ -136,6 +136,8 @@ function personBlock(rows,i){
 /* colonne: l'intestazione "Active voice | Passive voice" usa colspan, quindi conta le celle dei dati */
 function columnsFor(header,ncol){
   if(header&&colMap(header).length===ncol)return colMap(header);
+  /* tabella con la sola «Passive voice» (deponenti come μαθεύομαι): tutte le colonne sono passive, alternando indipendente e dipendente */
+  if(header){const h=header.join(' ');if(/passive/i.test(h)&&!/active/i.test(h))return Array.from({length:Math.min(ncol,4)},(_,k)=>({voice:'pass',dep:k%2===1}));}
   return DEFAULT_COLS.slice(0,Math.min(ncol,4));
 }
 
