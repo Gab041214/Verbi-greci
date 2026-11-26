@@ -227,8 +227,10 @@ export function rowsToEntry(rows,title){
   const entry={forms:[title],cls,gloss:'',O,source:'wiktionary',updated:new Date().toISOString().slice(0,10)};
   if(m)entry.m=m;
   if(impersonal)entry.im='act';
-  if(defective){entry.no='aor,saor,fut2,perf,plup,fperf,sperf,iaor';}
-  const want=defective?(O.ppres?['ppres','pimpf']:['pres','impf']):cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
+  /* verbo solo imperfettivo (μαστίζω: «Imperfective aspect only»): la tabella ha solo presente e imperfetto, senza colonne dipendente/aoristo */
+  const imperfOnly=!defective&&!rows.some(x=>x.some(c=>c.length<80&&/dependent|simple past|(?<![a-zα-ω])perfective/i.test(c)))&&!!(O.pres||O.ppres)&&!!(O.impf||O.pimpf);
+  if(defective||imperfOnly){entry.no='aor,saor,fut2,perf,plup,fperf,sperf,iaor';}
+  const want=imperfOnly?[...(O.pres||O.impf?['pres','impf']:[]),...(O.ppres||O.pimpf?['ppres','pimpf']:[])]:defective?(O.ppres?['ppres','pimpf']:['pres','impf']):cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
   want.forEach(k=>{if(O[k])report.found.push(k);else report.missing.push(k);});
   if(!cls.startsWith('D')&&(O.ppres||O.paor))report.found.push('passivo');
   ['ipres','iaor','ptc'].forEach(k=>{if(O[k])report.found.push(k);});
