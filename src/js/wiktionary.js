@@ -108,7 +108,7 @@ const colMap=h=>h.slice(1).map(c=>({voice:/passive/i.test(c)?'pass':'act',dep:/d
 const isHeader=r=>r.slice(1).some(c=>/voice/i.test(c));
 
 export function inferClass(title,O){
-  if(!O.pres){
+  if(!O.pres||/μαι$/.test(title)){
     if(/ιέμαι$/.test(title))return 'DB1';
     if(/ούμαι$/.test(title))return 'DB2';
     if(/άμαι$/.test(title))return 'DA';
@@ -141,7 +141,7 @@ function columnsFor(header,ncol){
 
 export function rowsToEntry(rows,title){
   const O={};const report={found:[],missing:[]};REPAIRS=[];
-  let header=null,bi=0,imp=0,defective=false;
+  let header=null,bi=0,imp=0,defective=false,impersonal=false;
   for(let i=0;i<rows.length;i++){
     const r=rows[i];
     if(isHeader(r)){header=r;continue;}
@@ -177,6 +177,8 @@ export function rowsToEntry(rows,title){
           if(bi===0)key=c.voice==='act'?(c.dep?'subj':'pres'):(c.dep?'psubj':'ppres');
           else if(bi===1)key=c.voice==='act'?(c.dep?'aor':'impf'):(c.dep?'paor':'pimpf');
           else return;
+          /* forme impersonali: solo 3ª singolare e 3ª plurale (νοιάζει, νοιάζουν) → le altre celle restano «—» */
+          if(filled<6&&c.voice==='act'&&arr.every((x,i)=>!x||i===2||i===5)){O[key]=arr.map(x=>x||'—');impersonal=true;return;}
           if(filled<6){report.missing.push(key+' (incompleto)');return;}
           O[key]=arr;
         });
@@ -222,6 +224,7 @@ export function rowsToEntry(rows,title){
   const cls=inferClass(title,O);
   const entry={forms:[title],cls,gloss:'',O,source:'wiktionary',updated:new Date().toISOString().slice(0,10)};
   if(m)entry.m=m;
+  if(impersonal)entry.im='act';
   if(defective){entry.no='aor,saor,fut2,perf,plup,fperf,sperf,iaor';}
   const want=defective?(O.ppres?['ppres','pimpf']:['pres','impf']):cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
   want.forEach(k=>{if(O[k])report.found.push(k);else report.missing.push(k);});

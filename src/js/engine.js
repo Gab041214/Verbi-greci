@@ -217,7 +217,7 @@ function buildPassive(e){
   f.pres=O.ppres||(tpl?tpl.pres.map(en=>joinAlt(base,j,en)):null);
   f.impf=O.pimpf||(tpl?tpl.impf.map(en=>joinAlt(base,j,en)):null);
   const dep=cls.startsWith('D');
-  if(dep&&(e.a||O.aor||O.subj)){
+  if(dep&&e.im!=='act'&&(e.a||O.aor||O.subj)){
     const ab=aoristBlock(e);f.aor=ab.aor;f.subj=ab.subj;f.inf=ab.inf;f.iaor=ab.iaor;
   }else if(e.p||O.paor||O.psubj){
     /* se l'aoristo passivo è stato corretto (es. υποβλήθηκα), congiuntivo, futuro, perfetto e imperativo ne ricavano la radice */
@@ -289,15 +289,25 @@ function conjugate(e){
   const no=new Set((e.no||'').split(',').map(s=>s.trim()).filter(Boolean));
   const voices=[];
   const dep=e.cls.startsWith('D');
-  if(!dep){
+  if(!dep||(e.im==='act'&&e.O.pres)){
     const a=buildActive(e);
-    voices.push({id:'act',label:'Voce attiva',gr:'Ενεργητική φωνή',cards:assemble(a,no,'act'),raw:a});
+    const cards=assemble(a,no,'act');
+    if(e.im==='act'){
+      /* verbo impersonale: solo 3ª singolare e 3ª plurale, le altre celle sono «—»; niente imperativo né gerundio */
+      /* persone ammesse = quelle compilate nel presente (solo 3ª sing., oppure 3ª sing. e plur.) */
+      const ok=(e.O.pres||[]).map(x=>!!x&&x!=='—');
+      for(const g of ['ind','sub'])cards[g].forEach(c=>{c.forms=c.forms.map((x,i)=>ok[i]?x:'—');});
+      cards.imp=[];cards.nom=cards.nom.filter(c=>c.id==='inf');
+    }
+    voices.push({id:'act',label:e.im==='act'?'Voce attiva (impersonale)':'Voce attiva',gr:'Ενεργητική φωνή',cards,raw:a});
   }
   const hasPass=dep||(e.p&&e.cls!=='X')||e.O.ppres||e.O.paor||e.O.psubj;
   if(hasPass){
     const p=buildPassive(e);
     if(p)voices.push({id:'pass',label:dep?'Forma passiva (deponente)':'Voce passiva',gr:'Παθητική φωνή',cards:assemble(p,no,'pass'),raw:p});
   }
+  /* deponente con forme attive impersonali: la voce passiva (quella vera del verbo) viene per prima */
+  if(dep&&voices.length>1)voices.sort((x,y)=>(x.id==='pass'?0:1)-(y.id==='pass'?0:1));
   return voices;
 }
 
@@ -305,7 +315,7 @@ function conjugate(e){
 function overrideKey(e,voiceId,field){
   if(voiceId==='act')return field;
   const dep=e.cls.startsWith('D');
-  const activeAor=dep&&(e.a||e.O.aor||e.O.subj);
+  const activeAor=dep&&e.im!=='act'&&(e.a||e.O.aor||e.O.subj);
   if(field==='pres')return 'ppres';
   if(field==='impf')return 'pimpf';
   if(field==='ipres')return 'pipres';
@@ -351,14 +361,14 @@ function loadLexicon(text){
 /* inverso: entry -> riga di testo nel formato del lessico */
 function entryToDsl(e){
   const parts=[e.forms.join('/'),e.cls,(e.gloss||'').replace(/ \| /g,' ')];
-  ['a','s','p','m','i','ps','pc','k','no'].forEach(k=>{if(e[k])parts.push(k+'='+e[k]);});
+  ['a','s','p','m','i','ps','pc','k','no','im'].forEach(k=>{if(e[k])parts.push(k+'='+e[k]);});
   Object.keys(e.O||{}).forEach(k=>{parts.push('O.'+k+'='+e.O[k].map(x=>x.replace(/ \/ /g,'/')).join(','));});
   return parts.join(' | ');
 }
 /* copia serializzabile (senza campi calcolati) */
 function serializeEntry(e){
   const o={};
-  ['forms','cls','gloss','a','s','p','m','i','ps','pc','k','no','source','gloss_en','gloss_p','updated','edited'].forEach(k=>{if(e[k]!==undefined&&e[k]!=='')o[k]=e[k];});
+  ['forms','cls','gloss','a','s','p','m','i','ps','pc','k','no','im','source','gloss_en','gloss_p','updated','edited'].forEach(k=>{if(e[k]!==undefined&&e[k]!=='')o[k]=e[k];});
   o.O=JSON.parse(JSON.stringify(e.O||{}));
   return o;
 }
@@ -392,7 +402,7 @@ export function formVariants(str){
     const w=t.trim();if(!w)continue;
     const m=w.match(/^([^()\s]+)\(([^()\s]+)\)$/);
     if(m){out.push(m[1],m[1]+m[2]);}
-    else{const x=w.replace(/[()]/g,'').trim();if(x&&!/\s/.test(x))out.push(x);}
+    else{const x=w.replace(/[()]/g,'').trim();if(x&&!/\s/.test(x)&&/[α-ωά-ώ]/i.test(x))out.push(x);}
   }
   return out;
 }
