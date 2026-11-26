@@ -768,7 +768,7 @@ $('bcopy').onclick=async()=>{const t=PROB.map(p=>p.t+'\t'+String(p.why).replace(
 $('bulkstop').onclick=()=>{stopBulk=true;};
 
 /* ---------- importa con le regole (verbi regolari senza tabella) ---------- */
-const RULES_END=/(ίζω|ώνω|εύω|άζω)$/;
+const RULES_END=/(ίζω|ώνω|εύω|άζω|σσω|ττω)$/;
 /* deponente = titolo in -μαι il cui verbo attivo non è né in archivio né tra gli scartati */
 function isDeponent(t){
   if(!isPassTitle(t))return false;

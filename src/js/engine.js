@@ -430,7 +430,7 @@ function guessAorist(S,cls){
   if(/ευ$/.test(S))return S.slice(0,-2)+'εψ';
   if(/(πτ|φτ)$/.test(S))return S.slice(0,-2)+'ψ';
   if(/[φβπ]$/.test(S))return S.slice(0,-1)+'ψ';
-  if(/(χν|σκ|ττ)$/.test(S))return S.slice(0,-2)+'ξ';
+  if(/(χν|σκ|ττ|σσ)$/.test(S))return S.slice(0,-2)+"ξ";
   if(/[γκχ]$/.test(S))return S.slice(0,-1)+'ξ';
   if(/αιν$/.test(S))return S.slice(0,-3);
   if(/ρν$/.test(S))return S.slice(0,-1);
@@ -464,6 +464,8 @@ function guessEntry(raw,forceCls){
   const e=finalizeEntry({forms:[t],cls,gloss:'',O:{},guessed:true});
   const b=strip(presentStem(e).base);
   if(cls==='A'||cls==='B1'||cls==='B2'){e.a=guessAorist(b,cls);e.p=guessPassive(e.a);}
+  /* -σσω/-ττω: passivo popolare in -χτηκα o dotto in -χθηκα: li do entrambi, si cancella quello sbagliato */
+  if(cls==='A'&&/(σσ|ττ)$/.test(b)&&e.p&&/χτ$/.test(e.p)){const E=['ηκα','ηκες','ηκε','ηκαμε','ηκατε','ηκαν(ε)'];e.O.paor=mergeVariants([pastForms(e.p,E,true),pastForms(e.p.slice(0,-2)+'χθ',E,true)]);}
   else if(cls==='D'){e.p=guessPassive(guessAorist(b,'A'));}
   else{e.p=guessPassive(guessAorist(b,'B1'));}
   return e;
