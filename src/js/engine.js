@@ -474,10 +474,9 @@ function guessEntry(raw,forceCls){
   const e=finalizeEntry({forms:[t],cls,gloss:'',O:{},guessed:true});
   const b=strip(presentStem(e).base);
   if(cls==='A'||cls==='B1'||cls==='B2'){e.a=guessAorist(b,cls);e.p=guessPassive(e.a);}
-  /* -σσω/-ττω: passivo popolare in -χτηκα o dotto in -χθηκα: li do entrambi, si cancella quello sbagliato */
-  if(cls==='A'&&/(σσ|ττ)$/.test(b)&&e.p&&/χτ$/.test(e.p)){const E=['ηκα','ηκες','ηκε','ηκαμε','ηκατε','ηκαν(ε)'];e.O.paor=mergeVariants([pastForms(e.p,E,true),pastForms(e.p.slice(0,-2)+'χθ',E,true)]);}
   else if(cls==='D'){e.p=guessPassive(guessAorist(b,'A'));}
   else{e.p=guessPassive(guessAorist(b,'B1'));}
+  if(cls==='A'&&/(σσ|ττ)$/.test(b)&&e.p&&/χτ$/.test(e.p)){const E=['ηκα','ηκες','ηκε','ηκαμε','ηκατε','ηκαν(ε)'];e.O.paor=mergeVariants([pastForms(e.p,E,true),pastForms(e.p.slice(0,-2)+'χθ',E,true)]);}
   if(cls==='B2'&&/ποι$/.test(b)&&!e.m)e.m=b+'ημένος';
   return e;
 }
