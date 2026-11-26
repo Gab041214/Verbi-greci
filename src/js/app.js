@@ -645,8 +645,44 @@ function bulkMarks(){
   $('bmodewrap').hidden=!(L&&np);$('bmode').options[1].textContent='Solo gli scartati ('+np+')';if(!(L&&np))$('bmode').value='all';
   $('binfo').textContent=!L?'':x?(x.complete?'Completata':'Iniziata, non completata')+' il '+x.date+' · salvati '+x.saved+' · saltati con problemi '+(x.problems||[]).length:'Lettera non ancora importata.';
 }
+/* più lettere: rilegge gli scartati di ogni lettera selezionata, una dopo l'altra */
+const bmSel=new Set();let bmSeen=false;
+function bmRender(){
+  const st=bulkState();
+  const ls=Object.keys(st).filter(l=>(st[l].problems||[]).length).sort((a,b)=>a.localeCompare(b,'el'));
+  $('bmulti').hidden=!ls.length;
+  if(!bmSeen&&ls.length){ls.forEach(l=>bmSel.add(l));bmSeen=true;}
+  $('bm-list').innerHTML=ls.map(l=>`<div class="rlrow"><label><input type="checkbox" data-l="${l}"${bmSel.has(l)?' checked':''}><span><b lang="el">${l}</b> <em>${st[l].problems.length} scartati</em></span></label></div>`).join('');
+  bmCount(ls);
+}
+function bmCount(ls){
+  const st=bulkState();ls=ls||Object.keys(st).filter(l=>(st[l].problems||[]).length);
+  const n=ls.filter(l=>bmSel.has(l)).length,tot=ls.filter(l=>bmSel.has(l)).reduce((a,l)=>a+st[l].problems.length,0);
+  $('bm-go').disabled=!n||$('bulkstop').disabled===false;
+  $('bm-go').textContent=n?'Avvia sulle selezionate ('+n+' lettere, '+tot+' verbi)':'Avvia sulle selezionate';
+}
+$('bm-list').addEventListener('change',ev=>{const c=ev.target;if(!c.dataset||!c.dataset.l)return;c.checked?bmSel.add(c.dataset.l):bmSel.delete(c.dataset.l);bmCount();});
+$('bm-all').onclick=()=>{$('bm-list').querySelectorAll('input').forEach(c=>{c.checked=true;bmSel.add(c.dataset.l);});bmCount();};
+$('bm-none').onclick=()=>{$('bm-list').querySelectorAll('input').forEach(c=>{c.checked=false;bmSel.delete(c.dataset.l);});bmCount();};
+$('bm-go').onclick=async()=>{
+  const st0=bulkState();
+  const letters=Object.keys(st0).filter(l=>bmSel.has(l)&&(st0[l].problems||[]).length).sort((a,b)=>a.localeCompare(b,'el'));
+  if(!letters.length)return;
+  let n=0,tot=0;stopBulk=false;
+  for(const l of letters){
+    n++;
+    const x=bulkState()[l];if(!x||!(x.problems||[]).length)continue;
+    $('bletter').value=l;bulkCont=null;PROB.length=0;PROB.push(...x.problems);bulkProblems();bulkMarks();$('bmode').value='skip';
+    $('bm-log').textContent='Lettera '+l+' ('+n+' di '+letters.length+')…';
+    await runBulk(true);
+    if(stopBulk)break;
+  }
+  $('bulk').disabled=false;$('bulkstop').disabled=true;
+  $('bm-log').textContent=(stopBulk?'Interrotto alla lettera ':'Finito. Ultima lettera: ')+$('bletter').value+' · restano scartati: '+Object.values(bulkState()).reduce((a,y)=>a+(y.problems||[]).length,0);
+  bmRender();
+};
 $('bletter').onchange=()=>{bulkCont=null;const x=bulkState()[$('bletter').value];PROB.length=0;if(x)PROB.push(...(x.problems||[]));bulkProblems();bulkMarks();};
-setTimeout(bulkMarks,0);
+setTimeout(()=>{bulkMarks();bmRender();},0);
 let ALT=0,DER=0,EL=0,PASSN=0,bulkPend=[],bulkNeed=[],bulkSeen=new Set(),bulkAlt=new Map();
 const bulkLog=(done,skipped,t)=>{$('blog').textContent=`Importati ${done} · già presenti ${skipped} · passive aggiunte ${PASSN} · da Wiktionary greca ${EL} · in attesa ${bulkPend.length} · forme alternative ${ALT} · derivati ${DER} · saltati con problemi ${PROB.length}`+(t?` — ultimo: ${t}`:'');};
 function bulkProblems(){
@@ -664,8 +700,8 @@ async function bulkPassive(t,final){
   }
   return final?'none':'defer';
 }
-$('bulk').onclick=async()=>{
-  stopBulk=false;$('bulk').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
+async function runBulk(multi){
+  stopBulk=false;$('bulk').disabled=true;$('bm-go').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
   let done=0,skipped=0;const L0=$('bletter').value;
   /* «solo gli scartati»: rileggo soltanto i verbi dell'elenco, senza scorrere tutta la categoria */
   let snap=null;const why0=new Map(),doneSet=new Set();
@@ -742,14 +778,15 @@ $('bulk').onclick=async()=>{
       }
     }
   }catch(err){$('blog').textContent='Interrotto: '+err.message;}
-  $('bulk').disabled=false;$('bulkstop').disabled=true;
+  if(!multi){$('bulk').disabled=false;$('bulkstop').disabled=true;bmRender();}
   /* se la ricerca degli scartati è stata fermata, quelli non ancora riletti restano nell'elenco */
   if(snap){snap.filter(t=>!doneSet.has(t)||bulkPend.includes(t)).forEach(t=>PROB.push({t,why:why0.get(t)||'non riletto'}));bulkProblems();}
   if(L0){const st=bulkState(),old=st[L0]||{saved:0};st[L0]={complete:snap?!!old.complete:!bulkCont&&!stopBulk,saved:(old.saved||0)+done,problems:PROB.map(p=>({...p})),date:new Date().toLocaleDateString('it-IT')};bulkStore(st);bulkMarks();}
   bulkLog(done,skipped);
   $('blog').textContent+=bulkCont?' (ripresa possibile)':(bulkPend.length||bulkNeed.length)?' (passate finali interrotte)':' — fine elenco';
   renderArchive&&renderArchive();
-};
+}
+$('bulk').onclick=()=>runBulk(false);
 /* campione di verbi saltati: per ogni tipo di problema, uno non in -ομαι e uno in -ομαι (o i primi due) */
 function bulkSample(){
   const by={};
