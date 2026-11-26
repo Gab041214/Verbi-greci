@@ -641,6 +641,8 @@ function bulkMarks(){
   [...$('bletter').options].forEach(o=>{const l=o.dataset.l||(o.dataset.l=o.value);if(!l)return;const x=st[l];o.textContent=l+(x?(x.complete?' ✓':' …'):'');});
   const L=$('bletter').value,x=st[L];
   $('binfo').hidden=!L;
+  const np=x&&x.problems?x.problems.length:0;
+  $('bmodewrap').hidden=!(L&&np);$('bmode').options[1].textContent='Solo gli scartati ('+np+')';if(!(L&&np))$('bmode').value='all';
   $('binfo').textContent=!L?'':x?(x.complete?'Completata':'Iniziata, non completata')+' il '+x.date+' · salvati '+x.saved+' · saltati con problemi '+(x.problems||[]).length:'Lettera non ancora importata.';
 }
 $('bletter').onchange=()=>{bulkCont=null;const x=bulkState()[$('bletter').value];PROB.length=0;if(x)PROB.push(...(x.problems||[]));bulkProblems();bulkMarks();};
@@ -664,7 +666,11 @@ async function bulkPassive(t,final){
 }
 $('bulk').onclick=async()=>{
   stopBulk=false;$('bulk').disabled=true;$('bulkstop').disabled=false;$('bprog').hidden=false;
-  let done=0,skipped=0;const L0=$('bletter').value;if(!bulkCont){PROB.length=0;ALT=0;DER=0;PASSN=0;EL=0;bulkPend=[];bulkNeed=[];bulkSeen=new Set();bulkAlt=new Map();}bulkProblems();
+  let done=0,skipped=0;const L0=$('bletter').value;
+  /* «solo gli scartati»: rileggo soltanto i verbi dell'elenco, senza scorrere tutta la categoria */
+  let snap=null;const why0=new Map(),doneSet=new Set();
+  if(L0&&$('bmode').value==='skip'&&!bulkCont&&PROB.length){snap=PROB.map(p=>p.t);PROB.forEach(p=>why0.set(p.t,p.why));}
+  if(!bulkCont){PROB.length=0;ALT=0;DER=0;PASSN=0;EL=0;bulkPend=[];bulkNeed=[];bulkSeen=new Set();bulkAlt=new Map();}bulkProblems();
   /* un verbo: restituisce 'q' se non ha usato la rete */
   const one=async(t,final)=>{
     if(!final)bulkSeen.add(keyOf(t));
@@ -707,7 +713,7 @@ $('bulk').onclick=async()=>{
   try{
     do{
       const L=$('bletter').value;
-      let {titles,next}=await listVerbs(bulkCont);
+      let {titles,next}=snap?{titles:snap.slice(),next:null}:await listVerbs(bulkCont);
       bulkCont=next;
       if(L)titles=titles.filter(t=>keyOf(t).startsWith(L));
       /* le forme passive (-μαι) per ultime: così, se il verbo attivo viene importato in questa stessa pagina, la sua voce passiva trova già l'attivo */
@@ -717,7 +723,7 @@ $('bulk').onclick=async()=>{
       for(const t of titles){
         if(stopBulk)break;
         i++;$('bprog').value=i;
-        const q=await one(t,false);
+        const q=await one(t,false);doneSet.add(t);
         bulkLog(done,skipped,t);
         if(q!=='q')await sleep(150);
       }
@@ -737,7 +743,9 @@ $('bulk').onclick=async()=>{
     }
   }catch(err){$('blog').textContent='Interrotto: '+err.message;}
   $('bulk').disabled=false;$('bulkstop').disabled=true;
-  if(L0){const st=bulkState(),old=st[L0]||{saved:0};st[L0]={complete:!bulkCont&&!stopBulk,saved:(old.saved||0)+done,problems:PROB.map(p=>({...p})),date:new Date().toLocaleDateString('it-IT')};bulkStore(st);bulkMarks();}
+  /* se la ricerca degli scartati è stata fermata, quelli non ancora riletti restano nell'elenco */
+  if(snap){snap.filter(t=>!doneSet.has(t)||bulkPend.includes(t)).forEach(t=>PROB.push({t,why:why0.get(t)||'non riletto'}));bulkProblems();}
+  if(L0){const st=bulkState(),old=st[L0]||{saved:0};st[L0]={complete:snap?!!old.complete:!bulkCont&&!stopBulk,saved:(old.saved||0)+done,problems:PROB.map(p=>({...p})),date:new Date().toLocaleDateString('it-IT')};bulkStore(st);bulkMarks();}
   bulkLog(done,skipped);
   $('blog').textContent+=bulkCont?' (ripresa possibile)':(bulkPend.length||bulkNeed.length)?' (passate finali interrotte)':' — fine elenco';
   renderArchive&&renderArchive();
