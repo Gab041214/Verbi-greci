@@ -659,7 +659,7 @@ function bmCount(ls){
   const st=bulkState();ls=ls||Object.keys(st).filter(l=>(st[l].problems||[]).length);
   const n=ls.filter(l=>bmSel.has(l)).length,tot=ls.filter(l=>bmSel.has(l)).reduce((a,l)=>a+st[l].problems.length,0);
   $('bm-go').disabled=!n||$('bulkstop').disabled===false;
-  $('bm-go').textContent=n?'Avvia sulle selezionate ('+n+' lettere, '+tot+' verbi)':'Avvia sulle selezionate';
+  $('bm-go').textContent='Avvia selezionate';$('bm-count').textContent=n?n+(n===1?' lettera, ':' lettere, ')+tot+(tot===1?' verbo':' verbi'):'Nessuna lettera selezionata';
 }
 $('bm-list').addEventListener('change',ev=>{const c=ev.target;if(!c.dataset||!c.dataset.l)return;c.checked?bmSel.add(c.dataset.l):bmSel.delete(c.dataset.l);bmCount();});
 $('bm-all').onclick=()=>{$('bm-list').querySelectorAll('input').forEach(c=>{c.checked=true;bmSel.add(c.dataset.l);});bmCount();};
@@ -668,7 +668,7 @@ $('bm-go').onclick=async()=>{
   const st0=bulkState();
   const letters=Object.keys(st0).filter(l=>bmSel.has(l)&&(st0[l].problems||[]).length).sort((a,b)=>a.localeCompare(b,'el'));
   if(!letters.length)return;
-  let n=0,tot=0;stopBulk=false;
+  let n=0,tot=0;stopBulk=false;$('bmulti').open=false;
   for(const l of letters){
     n++;
     const x=bulkState()[l];if(!x||!(x.problems||[]).length)continue;
