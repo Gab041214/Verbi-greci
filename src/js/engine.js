@@ -468,6 +468,7 @@ function guessEntry(raw,forceCls){
   if(cls==='A'&&/(σσ|ττ)$/.test(b)&&e.p&&/χτ$/.test(e.p)){const E=['ηκα','ηκες','ηκε','ηκαμε','ηκατε','ηκαν(ε)'];e.O.paor=mergeVariants([pastForms(e.p,E,true),pastForms(e.p.slice(0,-2)+'χθ',E,true)]);}
   else if(cls==='D'){e.p=guessPassive(guessAorist(b,'A'));}
   else{e.p=guessPassive(guessAorist(b,'B1'));}
+  if(cls==='B2'&&/ποι$/.test(b)&&!e.m)e.m=b+'ημένος';
   return e;
 }
 

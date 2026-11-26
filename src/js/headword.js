@@ -5,7 +5,7 @@ export function fromHeadword(entry,cls){
   const h=entry.fromHeadword||{};
   const g=guessEntry(entry.forms[0],cls);
   if(!g)throw new Error('Non riconosco la desinenza del verbo');
-  const e={...g,gloss:entry.gloss||'',gloss_en:entry.gloss_en,source:'wiktionary',updated:entry.updated,O:{}};
+  const e={...g,gloss:entry.gloss||'',gloss_en:entry.gloss_en,source:'wiktionary',updated:entry.updated,O:{...(g.O||{})}};
   delete e.guessed;
   const notes=[];
   if(h.past&&!e.cls.startsWith('D')){
