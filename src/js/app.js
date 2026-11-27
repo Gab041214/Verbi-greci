@@ -85,7 +85,19 @@ function allMarkKeys(e){
   return o;
 }
 /* verbi ricavati o calcolati con le regole: segna da subito le forme più incerte (aoristo e derivati) */
+/* una parola con due accenti (errore di battitura frequente nelle tabelle di Wiktionary, es. κατάσχόμουν) */
+const dblAccent=f=>String(f||'').normalize('NFC').split(/[\s,;\/()\[\]{}…‑-]+/).some(w=>(w.match(/[άέήίόύώΐΰ]/g)||[]).length>1);
+function markDoubleAccents(saved){
+  if(!saved)return;
+  const id=keyOf(saved.forms[0]),keys=[];
+  for(const v of safeConj(saved)||[])for(const g of Object.keys(v.cards))for(const c of v.cards[g]){
+    const fs=c.forms||[c.value];
+    fs.forEach((f,i)=>{if(dblAccent(f))keys.push(marks.markKey(v.id,c.id,i));});
+  }
+  if(keys.length)marks.setMany(id,keys,true);
+}
 function autoMark(saved,report){
+  markDoubleAccents(saved);
   if(!saved||!report||!(report.derived||report.addPass||report.noTable||report.el))return;
   const id=keyOf(saved.forms[0]),voices=report.addPass?['pass']:['act','pass'];
   const keys=[];
