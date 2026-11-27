@@ -30,3 +30,10 @@ test('προσθέτω: passivo προστίθεμαι/προσθέτομαι, e
   assert.equal(p.raw.pres[1],'προστίθεσαι / προσθέτεσαι');
   assert.equal(p.raw.aor[0],'προστέθηκα');
 });
+
+test('deponente: aoristo dalla riga del lemma (καταριέμαι → καταράστηκα)', () => {
+  const r=fromHeadword({forms:['καταριέμαι'],cls:null,gloss:'',O:{},fromHeadword:{past:'καταράστηκα',pasts:['καταράστηκα'],ppp:'καταραμένος'}});
+  const v=conjugate(r.entry).find(x=>x.id==='pass');
+  assert.equal(v.raw.aor[0],'καταράστηκα');
+  assert.equal(v.raw.subj[0],'καταραστώ');
+});
