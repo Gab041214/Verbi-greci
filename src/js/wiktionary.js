@@ -184,7 +184,7 @@ export function rowsToEntry(rows,title){
           else if(bi===1)key=c.voice==='act'?(c.dep?'aor':'impf'):(c.dep?'paor':'pimpf');
           else return;
           /* forme impersonali: solo 3ª singolare e 3ª plurale (νοιάζει, νοιάζουν) → le altre celle restano «—» */
-          if(filled<6&&c.voice==='act'&&arr.every((x,i)=>!x||i===2||i===5)){O[key]=arr.map(x=>x||'—');impersonal=true;return;}
+          if(filled<6&&arr.every((x,i)=>!x||i===2||i===5)){O[key]=arr.map(x=>x||'—');if(c.voice==='act')impersonal=true;return;}
           /* una sola persona mancante con il trattino nella tabella (ηγούμαι: imperfetto senza 2ª plurale): resta «—» */
           if(filled===5&&arr.every((x,i)=>x||/^[—–-]$/.test((blk[i][k+1]||'').trim()))){O[key]=arr.map(x=>x||'—');return;}
           if(filled<6){report.missing.push(key+' (incompleto)');return;}
@@ -201,6 +201,10 @@ export function rowsToEntry(rows,title){
           const ncol=Math.max(a.length,b.length)-1;
           columnsFor(header,ncol).forEach((c,k)=>{
             const x=[cleanCell(a[k+1]),cleanCell(b[k+1])];
+            /* una persona con il trattino nella tabella (εγκαθιστώ: manca la 2ª sing. dell'imperfettivo): resta «—», non la calcolo */
+            const dash=v=>/^[—–-]$/.test((v||'').trim());
+            if(!x[0]&&x[1]&&dash(a[k+1]))x[0]='—';
+            else if(!x[1]&&x[0]&&dash(b[k+1]))x[1]='—';
             if(!x[0]||!x[1])return;
             const key=c.voice==='act'?(c.dep?'iaor':'ipres'):(c.dep?'piaor':'pipres');
             O[key]=x;
