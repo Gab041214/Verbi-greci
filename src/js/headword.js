@@ -18,6 +18,14 @@ export function fromHeadword(entry,cls){
       else notes.push('aoristo '+h.past+' non riproducibile con le regole: correggilo a mano');
     }
   }
+  /* deponente: l'aoristo della riga del lemma (-ηκα) dà il tema passivo (καταριέμαι → καταράστηκα) */
+  const dp=e.cls.startsWith('D')&&(h.pasts||[h.past]).find(x=>/ηκα$/.test(x||''));
+  if(dp){
+    const t=finalizeEntry({...e,p:strip(dp).replace(/ηκα$/,''),O:{}});
+    const v=conjugate(t).find(x=>x.id==='pass');
+    if(v&&v.raw.aor&&v.raw.aor[0].split(' / ').includes(dp)){e.p=t.p;notes.push('aoristo preso dalla riga del lemma');}
+    else notes.push('aoristo '+dp+' non riproducibile con le regole: correggilo a mano');
+  }
   if(h.ppp)e.m=h.ppp;
   /* voce passiva: la riga del lemma dà la forma «passive X»; se le regole non la producono, non invento una passiva sbagliata */
   const pps=(h.passives&&h.passives.length?h.passives:(h.passive?[h.passive]:[]));

@@ -78,6 +78,22 @@ export async function fetchElEntry(title,f=fetch){
   }catch(_){return null;}
 }
 
+/* testo diagnostico della pagina greca: titoli, esito della lettura e righe delle tabelle */
+export async function fetchElDiag(title,f=fetch){
+  const out=['--- el.wiktionary: '+title];
+  try{
+    const u=EL_API+'?'+new URLSearchParams({format:'json',formatversion:'2',origin:'*',action:'parse',page:title,prop:'text',redirects:'1'});
+    const r=await f(u);if(!r.ok)throw new Error('risposta '+r.status);
+    const j=await r.json();if(j.error||!j.parse)throw new Error((j.error&&j.error.info)||'pagina non trovata');
+    const html=j.parse.text,rows=htmlToRows(html);
+    out.push('lunghezza pagina: '+html.length+' · tabelle: '+(html.match(/<table/gi)||[]).length+' · righe: '+rows.length);
+    out.push('tabella letta: '+(rowsToEntryEl(rows,title)?'sì':'no'));
+    out.push('titoli: '+[...html.matchAll(/<h[2-6][^>]*id="([^"]*)"/g)].map(m=>m[1]).join(', '));
+    rows.slice(0,70).forEach(x=>out.push(x.join(' | ').slice(0,200)));
+  }catch(e){out.push('non scaricata: '+(e&&e.message||'errore'));}
+  return out.join('\n');
+}
+
 /* come fetchVerb, ma se en.wiktionary non ha la tabella prova quella greca; la traduzione resta quella inglese */
 export async function fetchVerbFull(title,f=fetch){
   let en=null,err=null;
