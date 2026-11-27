@@ -322,3 +322,7 @@ select{-webkit-appearance:none;appearance:none;padding-right:46px;
 #bdiagbox .nowrap .btn{flex:0 0 auto}
 #bdiagbox .row:first-of-type .btn{flex:1 1 0;min-width:0;padding:0 10px;line-height:1.15}
 #bdiagbox input::placeholder{color:var(--mute);opacity:1}
+#bdiagbox .nowrap #bdiag{flex:1 1 auto;min-width:0;min-height:40px;font-size:.85rem;padding:0 8px}
+#bdiagbox .rllist{max-height:30vh}
+#bdiagbox .lbl{margin:12px 0 4px}
+#bdiagbox select{width:100%}
