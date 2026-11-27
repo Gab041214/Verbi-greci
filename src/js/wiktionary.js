@@ -178,11 +178,13 @@ export function rowsToEntry(rows,title){
         columnsFor(header,ncol).forEach((c,k)=>{
           const arr=blk.map(x=>cleanCell(x[k+1]));
           const filled=arr.filter(Boolean).length;
-          if(filled===0)return;
           let key;
           if(bi===0)key=c.voice==='act'?(c.dep?'subj':'pres'):(c.dep?'psubj':'ppres');
           else if(bi===1)key=c.voice==='act'?(c.dep?'aor':'impf'):(c.dep?'paor':'pimpf');
           else return;
+          /* imperfetto che non esiste (κατάσχω, attivo): tutte le celle sono «—» → colonna di trattini, non la calcolo */
+          if(filled===0&&(key==='impf'||key==='pimpf')&&arr.every((x,i)=>/^[—–-]$/.test((blk[i][k+1]||'').trim()))){O[key]=arr.map(()=>'—');return;}
+          if(filled===0)return;
           /* forme impersonali: solo 3ª singolare e 3ª plurale (νοιάζει, νοιάζουν) → le altre celle restano «—» */
           if(filled<6&&arr.every((x,i)=>!x||i===2||i===5)){O[key]=arr.map(x=>x||'—');if(c.voice==='act')impersonal=true;return;}
           /* una sola persona mancante con il trattino nella tabella (ηγούμαι: imperfetto senza 2ª plurale): resta «—» */
