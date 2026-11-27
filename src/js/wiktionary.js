@@ -87,6 +87,10 @@ export function cleanCell(s){
   const br=[...s.matchAll(/\[([^\]]*)\]/g)].map(m=>m[1]).join(',');
   const bf=splitForms(br);
   if(bf)return bf;
+  /* solo forme {dotte o arcaiche} (ηγούμαι, 2ª sing. imperfetto {ηγείσο}) */
+  const cu=[...s.matchAll(/\{([^}]*)\}/g)].map(m=>m[1]).join(',');
+  const cf=splitForms(cu);
+  if(cf)return cf;
   /* solo forme tra (parentesi tonde) (facoltative): se non c'è altro le tengo */
   const pr=[...s.matchAll(/\(([α-ωά-ώ]{2,})\)/g)].map(m=>m[1]).join(',');
   return splitForms(pr);
@@ -181,6 +185,8 @@ export function rowsToEntry(rows,title){
           else return;
           /* forme impersonali: solo 3ª singolare e 3ª plurale (νοιάζει, νοιάζουν) → le altre celle restano «—» */
           if(filled<6&&c.voice==='act'&&arr.every((x,i)=>!x||i===2||i===5)){O[key]=arr.map(x=>x||'—');impersonal=true;return;}
+          /* una sola persona mancante con il trattino nella tabella (ηγούμαι: imperfetto senza 2ª plurale): resta «—» */
+          if(filled===5&&arr.every((x,i)=>x||/^[—–-]$/.test((blk[i][k+1]||'').trim()))){O[key]=arr.map(x=>x||'—');return;}
           if(filled<6){report.missing.push(key+' (incompleto)');return;}
           O[key]=arr;
         });
