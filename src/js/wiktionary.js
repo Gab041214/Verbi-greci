@@ -81,6 +81,8 @@ function splitForms(s){
 }
 export function cleanCell(s){
   if(!s)return '';
+  /* rinvio ortografico accanto alla forma: «καλοσκέφτομαι (→ καλοσκέπτομαι (kalosképtomai))» → resta la forma di partenza */
+  s=s.replace(/\(\s*→[^()]*(?:\([^()]*\)[^()]*)*\)/g,'');
   const main=splitForms(s.replace(/\[[^\]]*\]/g,''));
   if(main)return main;
   /* solo forme tra [parentesi quadre] (poco usate): meglio di una cella vuota */
