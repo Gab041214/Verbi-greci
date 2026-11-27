@@ -4,7 +4,7 @@ import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
 import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktionary.js';
 import {fromHeadword} from './headword.js';
-import {fetchVerbFull,fetchElEntry} from './elwikt.js';
+import {fetchVerbFull,fetchElEntry,fetchElDiag} from './elwikt.js';
 import {isPassTitle,activeCandidates,passiveCandidates,lacksPassive,withPassive,withoutPassive,hasPassive} from './passive.js';
 import {splitPrefix,splitAna,deriveEntry} from './derive.js';
 import {initClearable} from './clearable.js';
@@ -827,7 +827,7 @@ $('bdiag').onclick=async()=>{
   const s=PROB.filter(p=>bdSel.has(p.t));if(!s.length)return;
   $('bdiag').disabled=true;
   const parts=[];let i=0;
-  for(const p of s){$('bdiag').textContent='Scarico '+(++i)+' di '+s.length+'…';try{parts.push('=== '+p.t+' — '+p.why+'\n'+await fetchDiag(p.t));}catch(err){parts.push('=== '+p.t+' — dettagli non scaricati: '+err.message);}await new Promise(r=>setTimeout(r,150));}
+  for(const p of s){$('bdiag').textContent='Scarico '+(++i)+' di '+s.length+'…';try{parts.push('=== '+p.t+' — '+p.why+'\n'+await fetchDiag(p.t)+(/^pagina senza tabella/.test(p.why)?'\n'+await fetchElDiag(p.t):''));}catch(err){parts.push('=== '+p.t+' — dettagli non scaricati: '+err.message);}await new Promise(r=>setTimeout(r,150));}
   const t=parts.join('\n\n');
   try{await navigator.clipboard.writeText(t);toast('Dettagli copiati ('+s.length+' verbi)');}catch(_){$('bprob').hidden=false;$('bprob-list').textContent=t;toast('Seleziona e copia');}
   $('bdiag').textContent='Copia dettagli';bdCount();
@@ -836,7 +836,7 @@ $('bd1go').onclick=async()=>{
   const t=$('bd1').value.trim();if(!t)return;
   const b=$('bd1go');b.disabled=true;b.textContent='Scarico…';
   let out;
-  try{out='=== '+t+' — richiesta manuale\n'+await fetchDiag(t);}catch(err){out='=== '+t+' — dettagli non scaricati: '+err.message;}
+  try{out='=== '+t+' — richiesta manuale\n'+await fetchDiag(t)+'\n'+await fetchElDiag(t);}catch(err){out='=== '+t+' — dettagli non scaricati: '+err.message;}
   try{await navigator.clipboard.writeText(out);toast('Dettagli copiati');}catch(_){$('bprob').hidden=false;$('bprob-list').textContent=out;toast('Seleziona e copia');}
   b.disabled=false;b.textContent='Copia dettagli';
 };
