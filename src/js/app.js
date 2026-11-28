@@ -4,7 +4,7 @@ import {LEXICON} from './lexicon.js';
 import * as store from './store.js';
 import {fetchVerb,lookupForm,listVerbs,parsePastedText,fetchDiag} from './wiktionary.js';
 import {fromHeadword} from './headword.js';
-import {fetchVerbFull,fetchElEntry,fetchElDiag} from './elwikt.js';
+import {fetchVerbFull,fetchElEntry} from './elwikt.js';
 import {isPassTitle,activeCandidates,passiveCandidates,lacksPassive,withPassive,withoutPassive,hasPassive} from './passive.js';
 import {splitPrefix,splitAna,deriveEntry} from './derive.js';
 import {initClearable} from './clearable.js';
@@ -803,13 +803,29 @@ $('bulk').onclick=()=>runBulk(false);
 /* Diagnostica: scelgo io quali verbi saltati analizzare */
 const bdSel=new Set();
 const bdKind=p=>p.why.split(' (')[0].replace(/:.*/,'');
+/* tutti gli scartati dell'alfabeto: lo stato salvato di ogni lettera, e per la lettera in corso l'elenco aggiornato */
+function bdAll(){
+  const st=bulkState(),cur=$('bletter').value,out=[],seen=new Set();
+  const add=(l,arr)=>arr.forEach(p=>{if(seen.has(p.t))return;seen.add(p.t);out.push({t:p.t,why:p.why,l});});
+  if(cur&&PROB.length)add(cur,PROB);
+  Object.keys(st).sort((x,y)=>x.localeCompare(y,'el')).forEach(l=>add(l,st[l].problems||[]));
+  if(!cur)add('',PROB);
+  return out;
+}
+function bdShown(){
+  const f=$('bd-filter').value,lf=$('bd-letter').value;
+  return bdAll().filter(p=>(!f||bdKind(p)===f)&&(!lf||p.l===lf));
+}
 function bdRender(){
-  const kinds={};PROB.forEach(p=>{const k=bdKind(p);kinds[k]=(kinds[k]||0)+1;});
-  const f=$('bd-filter'),cur=f.value;
-  f.innerHTML='<option value="">Tutti i tipi ('+PROB.length+')</option>'+Object.keys(kinds).map(k=>'<option value="'+k.replace(/"/g,'&quot;')+'">'+k+' ('+kinds[k]+')</option>').join('');
+  const all=bdAll();
+  const kinds={},lets={};all.forEach(p=>{const k=bdKind(p);kinds[k]=(kinds[k]||0)+1;if(p.l)lets[p.l]=(lets[p.l]||0)+1;});
+  const f=$('bd-filter'),cur=f.value,fl=$('bd-letter'),curL=fl.value;
+  f.innerHTML='<option value="">Tutti i tipi ('+all.length+')</option>'+Object.keys(kinds).map(k=>'<option value="'+k.replace(/"/g,'&quot;')+'">'+k+' ('+kinds[k]+')</option>').join('');
   f.value=kinds[cur]?cur:'';
-  [...bdSel].forEach(v=>{if(!PROB.some(p=>p.t===v))bdSel.delete(v);});
-  const shown=PROB.filter(p=>!f.value||bdKind(p)===f.value);
+  fl.innerHTML='<option value="">Tutte le lettere</option>'+Object.keys(lets).map(l=>'<option value="'+l+'">'+l+' ('+lets[l]+')</option>').join('');
+  fl.value=lets[curL]?curL:'';
+  [...bdSel].forEach(v=>{if(!all.some(p=>p.t===v))bdSel.delete(v);});
+  const shown=bdShown();
   $('bd-list').innerHTML=shown.map(p=>`<div class="rlrow"><label><input type="checkbox" data-v="${p.t}"${bdSel.has(p.t)?' checked':''}><span><b lang="el">${p.t}</b> <em>${p.why.replace(/</g,'&lt;')}</em></span></label></div>`).join('')||'<p class="mute">Nessun verbo saltato.</p>';
   bdCount();
 }
@@ -818,16 +834,16 @@ function bdCount(){
   $('bdiag').disabled=!n;
   $('bd-count').textContent=n?n+(n===1?' verbo scelto':' verbi scelti')+(n>20?' — sono molti: il testo copiato sarà lungo':''):'Nessun verbo scelto';
 }
-$('bd-filter').onchange=bdRender;
+$('bd-filter').onchange=bdRender;$('bd-letter').onchange=bdRender;
 $('bd-list').addEventListener('change',ev=>{const c=ev.target;if(!c.dataset||!c.dataset.v)return;c.checked?bdSel.add(c.dataset.v):bdSel.delete(c.dataset.v);bdCount();});
 $('bd-all').onclick=()=>{$('bd-list').querySelectorAll('input').forEach(c=>{c.checked=true;bdSel.add(c.dataset.v);});bdCount();};
 $('bd-none').onclick=()=>{$('bd-list').querySelectorAll('input').forEach(c=>{c.checked=false;bdSel.delete(c.dataset.v);});bdCount();};
 $('bdiagbox').addEventListener('toggle',()=>{if($('bdiagbox').open)bdRender();});
 $('bdiag').onclick=async()=>{
-  const s=PROB.filter(p=>bdSel.has(p.t));if(!s.length)return;
+  const s=bdAll().filter(p=>bdSel.has(p.t));if(!s.length)return;
   $('bdiag').disabled=true;
   const parts=[];let i=0;
-  for(const p of s){$('bdiag').textContent='Scarico '+(++i)+' di '+s.length+'…';try{parts.push('=== '+p.t+' — '+p.why+'\n'+await fetchDiag(p.t)+(/^pagina senza tabella/.test(p.why)?'\n'+await fetchElDiag(p.t):''));}catch(err){parts.push('=== '+p.t+' — dettagli non scaricati: '+err.message);}await new Promise(r=>setTimeout(r,150));}
+  for(const p of s){$('bdiag').textContent='Scarico '+(++i)+' di '+s.length+'…';try{parts.push('=== '+p.t+' — '+p.why+'\n'+await fetchDiag(p.t));}catch(err){parts.push('=== '+p.t+' — dettagli non scaricati: '+err.message);}await new Promise(r=>setTimeout(r,150));}
   const t=parts.join('\n\n');
   try{await navigator.clipboard.writeText(t);toast('Dettagli copiati ('+s.length+' verbi)');}catch(_){$('bprob').hidden=false;$('bprob-list').textContent=t;toast('Seleziona e copia');}
   $('bdiag').textContent='Copia dettagli';bdCount();
@@ -836,11 +852,11 @@ $('bd1go').onclick=async()=>{
   const t=$('bd1').value.trim();if(!t)return;
   const b=$('bd1go');b.disabled=true;b.textContent='Scarico…';
   let out;
-  try{out='=== '+t+' — richiesta manuale\n'+await fetchDiag(t)+'\n'+await fetchElDiag(t);}catch(err){out='=== '+t+' — dettagli non scaricati: '+err.message;}
+  try{out='=== '+t+' — richiesta manuale\n'+await fetchDiag(t);}catch(err){out='=== '+t+' — dettagli non scaricati: '+err.message;}
   try{await navigator.clipboard.writeText(out);toast('Dettagli copiati');}catch(_){$('bprob').hidden=false;$('bprob-list').textContent=out;toast('Seleziona e copia');}
   b.disabled=false;b.textContent='Copia dettagli';
 };
-$('bcopy').onclick=async()=>{const t=PROB.map(p=>p.t+'\t'+String(p.why).replace(/[\t\r\n]+/g,' ')).join('\n');try{await navigator.clipboard.writeText(t);toast('Elenco copiato');}catch(_){const r=document.createRange();r.selectNodeContents($('bprob-list'));const s2=getSelection();s2.removeAllRanges();s2.addRange(r);toast('Seleziona e copia');}};
+$('bcopy').onclick=async()=>{const t=bdShown().map(p=>p.t+'\t'+String(p.why).replace(/[\t\r\n]+/g,' ')+(p.l?'\t'+p.l:'')).join('\n');try{await navigator.clipboard.writeText(t);toast('Elenco copiato');}catch(_){const r=document.createRange();r.selectNodeContents($('bprob-list'));const s2=getSelection();s2.removeAllRanges();s2.addRange(r);toast('Seleziona e copia');}};
 $('bulkstop').onclick=()=>{stopBulk=true;};
 
 /* ---------- importa con le regole (verbi regolari senza tabella) ---------- */
