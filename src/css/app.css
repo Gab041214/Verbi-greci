@@ -329,3 +329,4 @@ select{-webkit-appearance:none;appearance:none;padding-right:46px;
 /* menu delle impostazioni: icona + testo */
 .bar .menu-vetro button,.bar .menu-vetro label{display:flex;align-items:center;gap:12px}
 .bar .menu-vetro .mi{flex:none;opacity:.8}
+#bdiagbox select+select{margin-top:8px}
