@@ -326,3 +326,6 @@ select{-webkit-appearance:none;appearance:none;padding-right:46px;
 #bdiagbox .rllist{max-height:30vh}
 #bdiagbox .lbl{margin:12px 0 4px}
 #bdiagbox select{width:100%}
+/* menu delle impostazioni: icona + testo */
+.bar .menu-vetro button,.bar .menu-vetro label{display:flex;align-items:center;gap:12px}
+.bar .menu-vetro .mi{flex:none;opacity:.8}
