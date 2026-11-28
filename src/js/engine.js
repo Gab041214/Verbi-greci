@@ -257,7 +257,9 @@ function partForms(m){
 
 function assemble(f,no,voice){
   const cards={ind:[],sub:[],imp:[],nom:[]};
-  const add=(g,id,it,gr,forms)=>{if(forms&&!no.has(id))cards[g].push({id,it,gr,forms});};
+  /* una persona che non esiste («—») non entra nei tempi derivati: «θα —» diventa «—» */
+  const dash=x=>(typeof x==='string'&&x!=='—'&&/(^|\s)—($|\s)/.test(x))?'—':x;
+  const add=(g,id,it,gr,forms)=>{if(forms&&!no.has(id))cards[g].push({id,it,gr,forms:Array.isArray(forms)?forms.map(dash):forms});};
   const inf=f.inf;
   add('ind','pres','Presente','Ενεστώτας',f.pres);
   add('ind','impf','Imperfetto','Παρατατικός',f.impf);
