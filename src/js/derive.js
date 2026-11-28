@@ -14,7 +14,7 @@ export function splitPrefix(lemma){
 
 /* ανα-, κατα-, παρα-, μετα-, επι-, υπο-, απο-, αντι-: il prefisso perde la vocale finale davanti all'aumento (ανα+έπλεξα = ανέπλεξα) e davanti alla vocale iniziale del verbo (ανα+αρπάζω = αναρπάζω).
    Si provano due letture: ανα+verbo che inizia per consonante, oppure αν+verbo che inizia per vocale. */
-export const AUG_PREFIXES=['ανα','κατα','παρα','μετα','επι','υπο','απο','αντι'];
+export const AUG_PREFIXES=['ανα','κατα','παρα','μετα','επι','υπο','απο','αντι','δια'];
 export function splitAna(lemma){
   const l=String(lemma||'').trim().toLowerCase();
   const out=[];
