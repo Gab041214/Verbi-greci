@@ -96,8 +96,20 @@ function markDoubleAccents(saved){
   }
   if(keys.length)marks.setMany(id,keys,true);
 }
+/* forme in cui l'importazione ha corretto lettere latine in greche: pallino «da controllare» */
+function markRepaired(saved,report){
+  if(!saved||!report||!report.repairs||!report.repairs.length)return;
+  const fixed=report.repairs.map(r=>String(r).split('→').pop().trim().normalize('NFC')).filter(Boolean);
+  const id=keyOf(saved.forms[0]),keys=[];
+  for(const v of safeConj(saved)||[])for(const g of Object.keys(v.cards))for(const c of v.cards[g]){
+    const fs=c.forms||[c.value];
+    fs.forEach((f,i)=>{const n=String(f||'').normalize('NFC');if(fixed.some(w=>n.includes(w)))keys.push(marks.markKey(v.id,c.id,i));});
+  }
+  if(keys.length)marks.setMany(id,keys,true);
+}
 function autoMark(saved,report){
   markDoubleAccents(saved);
+  markRepaired(saved,report);
   if(!saved||!report||!(report.derived||report.addPass||report.noTable||report.el))return;
   const id=keyOf(saved.forms[0]),voices=report.addPass?['pass']:['act','pass'];
   const keys=[];
@@ -753,7 +765,7 @@ async function runBulk(multi){
       const {entry,report}=fv;
       const why=entry.fromHeadword?'pagina senza tabella di coniugazione'
         :(report.missing&&report.missing.length)?'tabella incompleta ('+report.missing.join(', ')+')'
-        :(report.repairs&&report.repairs.length)?'forme con caratteri non greci ('+report.repairs.join('; ')+')':'';
+        :'';
       if(why){PROB.push({t,why});bulkProblems();}
       else{const sv=await saveUser(entry,{});autoMark(sv,report);done++;if(report.el)EL++;if(lacksPassive(sv))bulkNeed.push(keyOf(sv.forms[0]));}
     }catch(err){PROB.push({t,why:'non letta: '+(err&&err.message||'errore')});bulkProblems();}
