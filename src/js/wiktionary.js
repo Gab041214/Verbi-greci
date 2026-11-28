@@ -185,7 +185,7 @@ export function rowsToEntry(rows,title){
           else if(bi===1)key=c.voice==='act'?(c.dep?'aor':'impf'):(c.dep?'paor':'pimpf');
           else return;
           /* imperfetto che non esiste (κατάσχω, attivo): tutte le celle sono «—» → colonna di trattini, non la calcolo */
-          if(filled===0&&(key==='impf'||key==='pimpf')&&arr.every((x,i)=>/^[—–-]$/.test((blk[i][k+1]||'').trim()))){O[key]=arr.map(()=>'—');return;}
+          if(filled===0&&(key==='impf'||key==='pimpf')&&arr.every((x,i)=>/^[—–-]?$/.test((blk[i][k+1]||'').trim()))&&arr.filter((x,i)=>/^[—–-]$/.test((blk[i][k+1]||'').trim())).length>=5){O[key]=arr.map(()=>'—');return;}
           if(filled===0)return;
           /* forme impersonali: solo 3ª singolare e 3ª plurale (νοιάζει, νοιάζουν) → le altre celle restano «—» */
           if(filled<6&&arr.every((x,i)=>!x||i===2||i===5)){O[key]=arr.map(x=>x||'—');if(c.voice==='act')impersonal=true;return;}
