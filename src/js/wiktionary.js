@@ -240,6 +240,12 @@ export function rowsToEntry(rows,title){
   const cls=inferClass(title,O);
   const entry={forms:[title],cls,gloss:'',O,source:'wiktionary',updated:new Date().toISOString().slice(0,10)};
   if(m)entry.m=m;
+  /* forma alternativa che rimanda a questo verbo, scritta accanto alla 1ª persona: «συλλογίζομαι (συλλογιέμαι →)» → anche συλλογιέμαι porta qui */
+  {
+    const alts=[];
+    rows.forEach(r=>{if(lab(r)==='1 sg')r.slice(1).forEach(c=>{const mm=String(c).match(/\(\s*([α-ωά-ώ]{3,})\s*→\s*\)/);if(mm&&mm[1]!==title&&!alts.includes(mm[1]))alts.push(mm[1]);});});
+    alts.slice(0,3).forEach(a=>entry.forms.push(a));
+  }
   if(impersonal)entry.im='act';
   /* verbo solo imperfettivo (μαστίζω: «Imperfective aspect only»): la tabella ha solo presente e imperfetto, senza colonne dipendente/aoristo */
   const imperfOnly=!defective&&!rows.some(x=>x.some(c=>c.length<80&&/dependent|simple past|(?<![a-zα-ω])perfective/i.test(c)))&&!!(O.pres||O.ppres)&&!!(O.impf||O.pimpf);
