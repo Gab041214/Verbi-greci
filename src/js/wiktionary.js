@@ -266,7 +266,16 @@ export function rowsToEntry(rows,title){
   want.forEach(k=>{if(O[k])report.found.push(k);else report.missing.push(k);});
   if(!cls.startsWith('D')&&(O.ppres||O.paor))report.found.push('passivo');
   ['ipres','iaor','ptc'].forEach(k=>{if(O[k])report.found.push(k);});
-  if(REPAIRS.length)report.repairs=[...new Set(REPAIRS)];
+  if(REPAIRS.length){
+    /* una correzione è «confermata» se la stessa parola greca compare anche in un'altra forma della tabella: allora non serve ricontrollarla */
+    const toks=[];
+    const walk=v=>{if(Array.isArray(v))v.forEach(walk);else if(typeof v==='string')toks.push(...v.normalize('NFC').split(/[\s,;\/()\[\]{}…‑-]+/));else if(v&&typeof v==='object')Object.values(v).forEach(walk);};
+    walk(entry.O);
+    const uniq=[...new Set(REPAIRS)],bad=[];
+    uniq.forEach(r=>{const w=r.split('→').pop().trim().normalize('NFC');if(toks.filter(x=>x===w).length<2)bad.push(r);});
+    report.repairsAll=uniq;
+    if(bad.length)report.repairs=bad;
+  }
   return {entry,report};
 }
 
