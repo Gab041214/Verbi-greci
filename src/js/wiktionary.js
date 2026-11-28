@@ -325,7 +325,7 @@ function parseGreekVerbHtml0(html,title){
       const entry={forms:[title],cls,gloss:'',O,source:'wiktionary',updated:new Date().toISOString().slice(0,10),no:'aor,saor,fut2,perf,plup,fperf,sperf,iaor'};
       if(!pass)entry.im='act';
       const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
-      return {entry,report:{found:pass?['ppres','pimpf']:['pres','impf'],missing:[],repairs:['solo 3e persone, da testo']}};
+      return {entry,report:{found:pass?['ppres','pimpf']:['pres','impf'],missing:[],fromText:true}};
     }
   }
   const {entry,report}=rowsToEntry(htmlToRows(sec),title);
