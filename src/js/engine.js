@@ -304,7 +304,16 @@ function conjugate(e){
   const hasPass=dep||(e.p&&e.cls!=='X')||e.O.ppres||e.O.paor||e.O.psubj;
   if(hasPass){
     const p=buildPassive(e);
-    if(p)voices.push({id:'pass',label:dep?'Forma passiva (deponente)':'Voce passiva',gr:'Παθητική φωνή',cards:assemble(p,no,'pass'),raw:p});
+    if(p){
+      const pc=assemble(p,no,'pass');
+      /* passivo con le sole 3e persone (εξυπακούομαι, solo 3ª sing./plur.): le altre celle anche nei tempi composti restano «—» */
+      const okp=(e.O.ppres||[]).map(x=>!!x&&x!=='—');
+      if(okp.length===6&&okp.filter(x=>!x).length>=3&&okp.some(x=>x)){
+        for(const g of ['ind','sub'])pc[g].forEach(c=>{if(c.forms.length===6)c.forms=c.forms.map((x,i)=>okp[i]?x:'—');});
+        pc.imp=[];if(pc.nom)pc.nom=pc.nom.filter(c=>c.id==='inf');
+      }
+      voices.push({id:'pass',label:dep?'Forma passiva (deponente)':'Voce passiva',gr:'Παθητική φωνή',cards:pc,raw:p});
+    }
   }
   /* deponente con forme attive impersonali: la voce passiva (quella vera del verbo) viene per prima */
   if(dep&&voices.length>1)voices.sort((x,y)=>(x.id==='pass'?0:1)-(y.id==='pass'?0:1));

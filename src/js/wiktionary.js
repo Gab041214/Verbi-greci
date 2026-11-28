@@ -314,6 +314,20 @@ function parseGreekVerbHtml0(html,title){
       return {entry,report:{found:[],missing:['tabella assente su Wiktionary'],noTable:true}};
     }
   }
+  /* senza tabella, ma la riga Conjugation elenca le sole 3e persone (εξυπακούομαι: «Found only in passive 3rd persons of present and imperfect») */
+  if(!/<table[^>]*inflection-table/i.test(sec)){
+    const tx=htmlText(sec).replace(/\s+/g,' ');
+    const m=tx.match(/Found only in (passive|active) 3rd persons[^:]*:[\s,]*Present:\s*singular\s+([α-ωά-ώ]+)[^-]*?-\s*plural:\s*([α-ωά-ώ]+)[^]*?Imperfect:\s*singular\s+([α-ωά-ώ]+)[^-]*?-\s*plural:\s*([α-ωά-ώ]+)/i);
+    if(m){
+      const pass=m[1].toLowerCase()==='passive';
+      const O=pass?{ppres:['—','—',m[2],'—','—',m[3]],pimpf:['—','—',m[4],'—','—',m[5]]}:{pres:['—','—',m[2],'—','—',m[3]],impf:['—','—',m[4],'—','—',m[5]]};
+      const cls=inferClass(title,O);
+      const entry={forms:[title],cls,gloss:'',O,source:'wiktionary',updated:new Date().toISOString().slice(0,10),no:'aor,saor,fut2,perf,plup,fperf,sperf,iaor'};
+      if(!pass)entry.im='act';
+      const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
+      return {entry,report:{found:pass?['ppres','pimpf']:['pres','impf'],missing:[],repairs:['solo 3e persone, da testo']}};
+    }
+  }
   const {entry,report}=rowsToEntry(htmlToRows(sec),title);
   const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
   if(!entry.O.pres&&!entry.O.ppres)throw new Error('Tabella di coniugazione non trovata per '+title+' (la pagina non ha una tabella leggibile né la riga del verbo)');
