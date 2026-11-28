@@ -83,19 +83,22 @@ export function cleanCell(s){
   if(!s)return '';
   /* rinvio ortografico accanto alla forma: «καλοσκέφτομαι (→ καλοσκέπτομαι (kalosképtomai))» → resta la forma di partenza */
   s=s.replace(/\(\s*→[^()]*(?:\([^()]*\)[^()]*)*\)/g,'');
+  s=s.replace(/\s+&\s+/g,', ');   // «οικονομάω & οικονομώ»: due forme equivalenti
   const main=splitForms(s.replace(/\[[^\]]*\]/g,''));
   if(main)return main;
   /* solo forme tra [parentesi quadre] (poco usate): meglio di una cella vuota */
   const br=[...s.matchAll(/\[([^\]]*)\]/g)].map(m=>m[1]).join(',');
   const bf=splitForms(br);
   if(bf)return bf;
+  /* solo forme tra (parentesi tonde) (facoltative): se non c'è altro le tengo */
+  const pr=[...s.matchAll(/\(([α-ωά-ώ]{2,})\)/g)].map(m=>m[1]).join(',');
+  const prf=splitForms(pr);
+  if(prf)return prf;
   /* solo forme {dotte o arcaiche} (ηγούμαι, 2ª sing. imperfetto {ηγείσο}) */
   const cu=[...s.matchAll(/\{([^}]*)\}/g)].map(m=>m[1]).join(',');
   const cf=splitForms(cu);
   if(cf)return cf;
-  /* solo forme tra (parentesi tonde) (facoltative): se non c'è altro le tengo */
-  const pr=[...s.matchAll(/\(([α-ωά-ώ]{2,})\)/g)].map(m=>m[1]).join(',');
-  return splitForms(pr);
+  return cf?cf:'';
 }
 const PRON={'εγώ':'1 sg','εσύ':'2 sg','εμείς':'1 pl','εσείς':'2 pl'};
 /* normalizza l'etichetta di riga: "1st person singular" / "1st sg." / "εγώ" -> "1 sg" */
@@ -177,20 +180,24 @@ export function rowsToEntry(rows,title){
         }
         if(futCols.length)continue;
         const ncol=ncol0;
-        columnsFor(header,ncol).forEach((c,k)=>{
+        /* tabella a una sola colonna senza intestazione di voce, di un verbo in -μαι (άγχομαι: «Present tense only»): è passiva */
+        const cols0=(ncol===1&&!header&&/μαι$/.test(title))?[{voice:'pass',dep:false}]:columnsFor(header,ncol);
+        cols0.forEach((c,k)=>{
           const arr=blk.map(x=>cleanCell(x[k+1]));
           const filled=arr.filter(Boolean).length;
           let key;
           if(bi===0)key=c.voice==='act'?(c.dep?'subj':'pres'):(c.dep?'psubj':'ppres');
           else if(bi===1)key=c.voice==='act'?(c.dep?'aor':'impf'):(c.dep?'paor':'pimpf');
           else return;
-          /* imperfetto che non esiste (κατάσχω, attivo): tutte le celle sono «—» → colonna di trattini, non la calcolo */
-          if(filled===0&&(key==='impf'||key==='pimpf')&&arr.every((x,i)=>/^[—–-]?$/.test((blk[i][k+1]||'').trim()))&&arr.filter((x,i)=>/^[—–-]$/.test((blk[i][k+1]||'').trim())).length>=5){O[key]=arr.map(()=>'—');return;}
-          if(filled===0)return;
+          /* nella tabella di Wiktionary il «—» dice che quella forma non esiste: la cella resta «—», non la calcolo (κατάσχω, διέπω, ηγούμαι, άγχομαι, πρωτοκολλώ) */
+          const raw=x=>(blk[x][k+1]||'').trim(),isDash=x=>/^[—–-]$/.test(raw(x));
+          if(filled===0){
+            if(key!=='pres'&&key!=='ppres'&&arr.every((x,i)=>isDash(i)||!raw(i))&&arr.filter((x,i)=>isDash(i)).length>=5)O[key]=arr.map(()=>'—');
+            return;
+          }
           /* forme impersonali: solo 3ª singolare e 3ª plurale (νοιάζει, νοιάζουν) → le altre celle restano «—» */
           if(filled<6&&arr.every((x,i)=>!x||i===2||i===5)){O[key]=arr.map(x=>x||'—');if(c.voice==='act')impersonal=true;return;}
-          /* una sola persona mancante con il trattino nella tabella (ηγούμαι: imperfetto senza 2ª plurale): resta «—» */
-          if(filled===5&&arr.every((x,i)=>x||/^[—–-]$/.test((blk[i][k+1]||'').trim()))){O[key]=arr.map(x=>x||'—');return;}
+          if(filled<6&&arr.every((x,i)=>x||isDash(i))){O[key]=arr.map(x=>x||'—');return;}
           if(filled<6){report.missing.push(key+' (incompleto)');return;}
           O[key]=arr;
         });
@@ -249,8 +256,13 @@ export function rowsToEntry(rows,title){
   if(impersonal)entry.im='act';
   /* verbo solo imperfettivo (μαστίζω: «Imperfective aspect only»): la tabella ha solo presente e imperfetto, senza colonne dipendente/aoristo */
   const imperfOnly=!defective&&!rows.some(x=>x.some(c=>c.length<80&&/dependent|simple past|(?<![a-zα-ω])perfective/i.test(c)))&&!!(O.pres||O.ppres)&&!!(O.impf||O.pimpf);
+  /* verbo con il solo presente (αλγώ, άρχω, άγχομαι: «Present tense only»): niente imperfetto, aoristo e tempi composti */
+  const presOnly=!defective&&!imperfOnly&&!!(O.pres||O.ppres)&&!(O.impf||O.pimpf||O.aor||O.paor||O.subj||O.psubj);
   if(defective||imperfOnly){entry.no='aor,saor,fut2,perf,plup,fperf,sperf,iaor';}
-  const want=imperfOnly?[...(O.pres||O.impf?['pres','impf']:[]),...(O.ppres||O.pimpf?['ppres','pimpf']:[])]:defective?(O.ppres?['ppres','pimpf']:['pres','impf']):cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
+  if(presOnly)entry.no='impf,aor,saor,fut2,perf,plup,fperf,sperf,iaor,inf,part'+(O.ipres?'':',ipres')+(O.ptc?'':',ptc');
+  /* deponente senza congiuntivo dipendente (αναφύομαι: colonna «Dependent» tutta «—»): niente futuro semplice né tempi composti */
+  if(cls.startsWith('D')&&O.psubj&&O.psubj.every(x=>x==='—'))entry.no='saor,fut2,perf,plup,fperf,sperf';
+  const want=presOnly?[O.pres?'pres':'ppres']:imperfOnly?[...(O.pres||O.impf?['pres','impf']:[]),...(O.ppres||O.pimpf?['ppres','pimpf']:[])]:defective?(O.ppres?['ppres','pimpf']:['pres','impf']):cls.startsWith('D')?['ppres','pimpf','paor','psubj']:['pres','impf','aor','subj'];
   want.forEach(k=>{if(O[k])report.found.push(k);else report.missing.push(k);});
   if(!cls.startsWith('D')&&(O.ppres||O.paor))report.found.push('passivo');
   ['ipres','iaor','ptc'].forEach(k=>{if(O[k])report.found.push(k);});
@@ -334,9 +346,28 @@ function parseGreekVerbHtml0(html,title){
       return {entry,report:{found:pass?['ppres','pimpf']:['pres','impf'],missing:[],fromText:true}};
     }
   }
+  /* solo 3e persone del presente, senza imperfetto (απαρέσκω: «Found only in the 3rd persons of present tense: singular X, plural Y») */
+  if(!/<table[^>]*inflection-table/i.test(sec)){
+    const tx=htmlText(sec).replace(/\s+/g,' ');
+    const m=tx.match(/Found only in (?:the )?(passive |active )?3rd persons of (?:the )?present(?: tense)?[\s:,]*singular:?\s+([α-ωά-ώ]+)[^]*?plural:?\s+([α-ωά-ώ]+)/i);
+    if(m&&!/Imperfect:/i.test(tx.slice(m.index,m.index+400))){
+      const pass=(m[1]||'').trim().toLowerCase()==='passive'||/μαι$/.test(title);
+      const arr=['—','—',m[2],'—','—',m[3]];
+      const O=pass?{ppres:arr}:{pres:arr};
+      const cls=inferClass(title,O);
+      const entry={forms:[title],cls,gloss:'',O,source:'wiktionary',updated:new Date().toISOString().slice(0,10),no:'impf,aor,saor,fut2,perf,plup,fperf,sperf,iaor,inf,part,ipres,ptc'};
+      if(!pass)entry.im='act';
+      const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
+      return {entry,report:{found:[pass?'ppres':'pres'],missing:[],fromText:true}};
+    }
+  }
   const {entry,report}=rowsToEntry(htmlToRows(sec),title);
   const g=firstGloss(sec);if(g){entry.gloss_en=g;entry.gloss=g;}
-  if(!entry.O.pres&&!entry.O.ppres)throw new Error('Tabella di coniugazione non trovata per '+title+' (la pagina non ha una tabella leggibile né la riga del verbo)');
+  if(!entry.O.pres&&!entry.O.ppres){
+    const rm=htmlText(sec).replace(/\s+/g,' ').match(/Conjugation\s*(?:edit\s*)?see:\s*([α-ωά-ώ]+)/i);
+    if(rm)throw new Error('Rimanda a '+rm[1]+': importa quel verbo (la pagina di '+title+' non ha una tabella propria)');
+    throw new Error('Tabella di coniugazione non trovata per '+title+' (la pagina non ha una tabella leggibile né la riga del verbo)');
+  }
   return {entry,report};
 }
 export function parsePastedText(text,title){
